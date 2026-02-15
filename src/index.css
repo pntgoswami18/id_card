@@ -1,0 +1,40 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  overflow: auto;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-view-container,
+  .print-view-container * {
+    visibility: visible;
+  }
+  .print-view-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+  .print-card {
+    break-after: page;
+    page-break-after: always;
+  }
+  .print-card:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}
