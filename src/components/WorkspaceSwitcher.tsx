@@ -19,6 +19,8 @@ import Add from '@mui/icons-material/Add';
 import Edit from '@mui/icons-material/Edit';
 import Delete from '@mui/icons-material/Delete';
 import Image from '@mui/icons-material/Image';
+import CloudDownload from '@mui/icons-material/CloudDownload';
+import CloudUpload from '@mui/icons-material/CloudUpload';
 import type { WorkspaceMeta, WorkspaceData } from '../utils/workspaceStorage';
 import {
   getWorkspaceList,
@@ -31,6 +33,7 @@ import {
   getDefaultWorkspaceData,
   saveWorkspaceData,
 } from '../utils/workspaceStorage';
+import { downloadBackup, restoreFromBackup, type BackupData } from '../utils/backup';
 
 interface WorkspaceSwitcherProps {
   workspaceList: WorkspaceMeta[];
@@ -71,8 +74,10 @@ export default function WorkspaceSwitcher({
   const [editName, setEditName] = useState('');
   const [editLogo, setEditLogo] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const newLogoInputRef = useRef<HTMLInputElement>(null);
   const editLogoInputRef = useRef<HTMLInputElement>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
 
   const currentMeta = workspaceList.find((w) => w.id === currentWorkspaceId);
   const currentName = currentMeta?.name ?? 'Workspace';
@@ -163,6 +168,36 @@ export default function WorkspaceSwitcher({
     setDeleteOpen(false);
   };
 
+  const handleBackup = () => {
+    onSaveCurrent();
+    downloadBackup();
+    handleClose();
+  };
+
+  const handleRestoreClick = () => {
+    setRestoreError(null);
+    restoreInputRef.current?.click();
+    handleClose();
+  };
+
+  const handleRestoreFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text) as BackupData;
+      const result = restoreFromBackup(backup);
+      if (result.ok) {
+        window.location.reload();
+      } else {
+        setRestoreError(result.error);
+      }
+    } catch {
+      setRestoreError('Invalid backup file. Please select a valid JSON backup.');
+    }
+  };
+
   return (
     <ClickAwayListener onClickAway={() => anchorEl != null && handleClose()}>
       <Box>
@@ -230,7 +265,38 @@ export default function WorkspaceSwitcher({
           </ListItemIcon>
           <ListItemText primary="Delete current" />
         </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleBackup}>
+          <ListItemIcon>
+            <CloudDownload fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary="Backup Data" />
+        </MenuItem>
+        <MenuItem onClick={handleRestoreClick}>
+          <ListItemIcon>
+            <CloudUpload fontSize="small" />
+          </ListItemIcon>
+          <ListItemText primary="Restore From Backup" />
+        </MenuItem>
       </Menu>
+
+      <input
+        ref={restoreInputRef}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: 'none' }}
+        onChange={handleRestoreFileChange}
+      />
+
+      <Dialog open={Boolean(restoreError)} onClose={() => setRestoreError(null)}>
+        <DialogTitle>Restore Failed</DialogTitle>
+        <DialogContent>
+          <Typography color="error">{restoreError}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRestoreError(null)}>OK</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={newOpen} onClose={() => setNewOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>New Workspace</DialogTitle>
