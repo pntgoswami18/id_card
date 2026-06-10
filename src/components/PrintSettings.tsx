@@ -61,7 +61,12 @@ export default function PrintSettingsComponent({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Typography variant="subtitle2">Size (mm)</Typography>
+      <Box>
+        <Typography variant="subtitle2">Card size (mm)</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Each card prints on its own page at these exact dimensions.
+        </Typography>
+      </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>
         <TextField
           size="small"
