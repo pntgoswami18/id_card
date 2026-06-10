@@ -218,6 +218,7 @@ function FitText({
   designMode,
   containerWidthPercent,
   containerHeightPercent,
+  verticalAlign = 'center',
 }: {
   text: string;
   fontWeight: 'normal' | 'bold';
@@ -226,6 +227,7 @@ function FitText({
   designMode?: boolean;
   containerWidthPercent?: number;
   containerHeightPercent?: number;
+  verticalAlign?: 'top' | 'center' | 'bottom';
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const spanRef = useRef<HTMLSpanElement>(null);
@@ -321,16 +323,10 @@ function FitText({
           right: 0,
           top: 0,
           bottom: 0,
-          fontSize: `${fontSize}px`,
-          fontWeight,
-          color,
-          ...(fontFamilyProp && { fontFamily: fontFamilyProp }),
-          lineHeight: 1.2,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'normal',
-          overflowWrap: 'normal',
           overflow: 'hidden',
-          display: 'block',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: verticalAlign === 'top' ? 'flex-start' : verticalAlign === 'bottom' ? 'flex-end' : 'center',
           width: '100%',
           height: '100%',
           boxSizing: 'border-box',
@@ -338,10 +334,16 @@ function FitText({
           paddingRight: '0.5em',
           paddingTop: '0.3em',
           paddingBottom: '0.3em',
+          fontSize: `${fontSize}px`,
+          fontWeight,
+          color,
+          ...(fontFamilyProp && { fontFamily: fontFamilyProp }),
           pointerEvents: designMode ? 'none' : 'auto',
         }}
       >
-        {text?.trim() || '\u00A0'}
+        <div style={{ lineHeight: 1.2, whiteSpace: 'pre-wrap', wordBreak: 'normal', overflowWrap: 'normal' }}>
+          {text?.trim() || '\u00A0'}
+        </div>
       </span>
     </div>
   );
@@ -749,6 +751,7 @@ export default function CardCanvas({
             designMode={designMode}
             containerWidthPercent={el.width}
             containerHeightPercent={el.height}
+            verticalAlign={textOrLabelEl.verticalAlign ?? 'center'}
           />
         ) : (
           <span
@@ -795,7 +798,9 @@ export default function CardCanvas({
           ...style,
         ...((el.type === 'text' || el.type === 'label') && {
           display: 'flex',
-          alignItems: 'center',
+          alignItems: (el as TextElement | LabelElement).verticalAlign === 'top' ? 'flex-start'
+            : (el as TextElement | LabelElement).verticalAlign === 'bottom' ? 'flex-end'
+            : 'center',
         }),
         }}
         onMouseDown={elementsEditable ? (e) => handleElementMouseDown(e, el.id) : undefined}

@@ -7,6 +7,11 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Autocomplete from '@mui/material/Autocomplete';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import ToggleButton from '@mui/material/ToggleButton';
+import VerticalAlignTopIcon from '@mui/icons-material/VerticalAlignTop';
+import VerticalAlignCenterIcon from '@mui/icons-material/VerticalAlignCenter';
+import VerticalAlignBottomIcon from '@mui/icons-material/VerticalAlignBottom';
 import type { TemplateElement, TextElement, ImageElement, LabelElement } from '../../types';
 
 const FONT_SIZE_OPTIONS: (string | number)[] = [
@@ -252,6 +257,24 @@ export default function ElementPropertiesPanel({
               <MenuItem value="bold">Bold</MenuItem>
             </Select>
           </FormControl>
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+              Vertical align
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              fullWidth
+              value={(element as TextElement | LabelElement).verticalAlign ?? 'center'}
+              onChange={(_, value) => {
+                if (value) onUpdate({ verticalAlign: value } as Partial<TemplateElement>);
+              }}
+            >
+              <ToggleButton value="top" aria-label="Top"><VerticalAlignTopIcon fontSize="small" /></ToggleButton>
+              <ToggleButton value="center" aria-label="Center"><VerticalAlignCenterIcon fontSize="small" /></ToggleButton>
+              <ToggleButton value="bottom" aria-label="Bottom"><VerticalAlignBottomIcon fontSize="small" /></ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
           <Autocomplete
             freeSolo
             size="small"

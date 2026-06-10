@@ -21,6 +21,7 @@ export interface TextElement extends BaseElement {
   color?: string;
   /** Font family (e.g. system font name). Uses card default if not set. */
   fontFamily?: string;
+  verticalAlign?: 'top' | 'center' | 'bottom';
 }
 
 export interface ImageElement extends BaseElement {
@@ -42,6 +43,7 @@ export interface LabelElement extends BaseElement {
   color?: string;
   /** Font family (e.g. system font name). Uses card default if not set. */
   fontFamily?: string;
+  verticalAlign?: 'top' | 'center' | 'bottom';
 }
 
 export type TemplateElement = TextElement | ImageElement | LabelElement;
