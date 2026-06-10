@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -220,7 +220,9 @@ export default function WorkspaceSwitcher({
   // ---- Edit ----
   const handleEditOpen = () => {
     setEditName(currentMeta?.name ?? '');
-    setEditLogo(currentLogo ?? null);
+    // Use only this workspace's own logo — don't inherit the parent's logo as a default,
+    // which would accidentally copy it onto the child on save.
+    setEditLogo(currentWorkspaceLogo ?? currentMeta?.logo ?? null);
     setEditOpen(true);
     handleClose();
   };
@@ -338,9 +340,9 @@ export default function WorkspaceSwitcher({
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          {/* Workspace tree */}
+          {/* Workspace tree — React.Fragment preserves valid ul > li DOM structure */}
           {rootWorkspaces.map((w) => (
-            <Box key={w.id}>
+            <React.Fragment key={w.id}>
               {/* Parent (root) row */}
               <MenuItem selected={w.id === currentWorkspaceId} onClick={() => handleSwitch(w.id)}>
                 {w.logo ? (
@@ -383,7 +385,7 @@ export default function WorkspaceSwitcher({
                   primaryTypographyProps={{ variant: 'body2', color: 'primary' }}
                 />
               </MenuItem>
-            </Box>
+            </React.Fragment>
           ))}
 
           <Divider />

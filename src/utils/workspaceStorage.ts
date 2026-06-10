@@ -169,6 +169,9 @@ export function getChildWorkspaces(parentId: string): WorkspaceMeta[] {
 /** Creates a sub-workspace under the given parent. Switches to it as current. */
 export function createSubWorkspace(name: string, parentId: string, logo?: string): WorkspaceMeta {
   const list = getWorkspaceList();
+  const parent = list.workspaces.find((w) => w.id === parentId);
+  if (!parent) throw new Error(`createSubWorkspace: parent "${parentId}" not found`);
+  if (parent.parentId) throw new Error(`createSubWorkspace: cannot nest sub-workspaces (parent "${parentId}" is already a child)`);
   const id = createWorkspaceId();
   const meta: WorkspaceMeta = { id, name, parentId, ...(logo != null && logo !== '' && { logo }) };
   list.workspaces = [...list.workspaces, meta];
