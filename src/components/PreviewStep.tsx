@@ -21,6 +21,8 @@ export default function PreviewStep() {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [webcamOpen, setWebcamOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [pendingPhotoName, setPendingPhotoName] = useState('');
+  const [photoDisplayNames, setPhotoDisplayNames] = useState<Record<number, Record<string, string>>>({});
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(24);
 
@@ -46,7 +48,7 @@ export default function PreviewStep() {
 
   const bindings = template.elements
     .filter((e) => e.binding)
-    .map((e) => ({ elementId: e.id, binding: e.binding! }));
+    .map((e) => ({ elementId: e.id, binding: e.binding!, isImage: e.type === 'image' }));
 
   const imageBinding =
     template.elements.find((e) => e.type === 'image' && e.binding)?.binding ?? 'photo';
@@ -66,13 +68,18 @@ export default function PreviewStep() {
     setWebcamOpen(true);
   };
 
-  const handlePhotoReady = (dataUrl: string) => {
+  const handlePhotoReady = (dataUrl: string, name: string) => {
     setCropSrc(dataUrl);
+    setPendingPhotoName(name);
   };
 
   const handleWebcamCapture = (dataUrl: string) => {
     setWebcamOpen(false);
     setCropSrc(dataUrl);
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const name = `Photo ${pad(now.getDate())} ${now.toLocaleString('en', { month: 'short' })} ${now.getFullYear()}, ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    setPendingPhotoName(name);
   };
 
   const handleCropConfirm = (croppedUrl: string) => {
@@ -81,6 +88,13 @@ export default function PreviewStep() {
       type: 'UPDATE_RECORD_OVERRIDES',
       payload: { index: editIndex, overrides: { [imageBinding]: croppedUrl } },
     });
+    if (pendingPhotoName) {
+      setPhotoDisplayNames((prev) => ({
+        ...prev,
+        [editIndex]: { ...(prev[editIndex] ?? {}), [imageBinding]: pendingPhotoName },
+      }));
+    }
+    setPendingPhotoName('');
     setCropSrc(null);
     setEditIndex(null);
   };
@@ -192,6 +206,7 @@ export default function PreviewStep() {
         onSave={handleSaveOverrides}
         onTakePhoto={handleTakePhotoFromDialog}
         onPhotoReady={handlePhotoReady}
+        photoDisplayNames={editIndex != null ? (photoDisplayNames[editIndex] ?? {}) : {}}
       />
 
       <WebcamCapture

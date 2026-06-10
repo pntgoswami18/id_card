@@ -6,16 +6,18 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import type { CardRecord } from '../types';
 
 interface CardEditDialogProps {
   open: boolean;
   onClose: () => void;
   record: CardRecord | null;
-  bindings: { elementId: string; binding: string }[];
+  bindings: { elementId: string; binding: string; isImage?: boolean }[];
   onSave: (overrides: Record<string, string | null>) => void;
   onTakePhoto: () => void;
-  onPhotoReady: (dataUrl: string) => void;
+  onPhotoReady: (dataUrl: string, name: string) => void;
+  photoDisplayNames: Record<string, string>;
 }
 
 function getValue(record: CardRecord | null, binding: string): string {
@@ -32,6 +34,7 @@ export default function CardEditDialog({
   onSave,
   onTakePhoto,
   onPhotoReady,
+  photoDisplayNames,
 }: CardEditDialogProps) {
   const [values, setValues] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,10 +51,11 @@ export default function CardEditDialog({
       alert('Image must be under 10 MB.');
       return;
     }
+    const fileName = file.name;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result;
-      if (typeof result === 'string') onPhotoReady(result);
+      if (typeof result === 'string') onPhotoReady(result, fileName);
     };
     reader.readAsDataURL(file);
   };
@@ -86,16 +90,54 @@ export default function CardEditDialog({
       <DialogTitle>Edit Card</DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          {bindings.map(({ binding }) => (
-            <TextField
-              key={binding}
-              fullWidth
-              size="small"
-              label={binding}
-              value={values[binding] ?? ''}
-              onChange={(e) => handleChange(binding, e.target.value)}
-            />
-          ))}
+          {bindings.map(({ binding, isImage }) => {
+            const value = values[binding] ?? '';
+            if (isImage) {
+              const hasPhoto = value.startsWith('data:image/');
+              const displayName = photoDisplayNames[binding];
+              return (
+                <Box
+                  key={binding}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    px: 1.5,
+                    py: 1,
+                  }}
+                >
+                  {hasPhoto && (
+                    <Box
+                      component="img"
+                      src={value}
+                      sx={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }}
+                    />
+                  )}
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {binding}
+                    </Typography>
+                    <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {hasPhoto ? (displayName ?? 'Photo') : '(no photo)'}
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            }
+            return (
+              <TextField
+                key={binding}
+                fullWidth
+                size="small"
+                label={binding}
+                value={value}
+                onChange={(e) => handleChange(binding, e.target.value)}
+              />
+            );
+          })}
           <input
             ref={fileInputRef}
             type="file"
