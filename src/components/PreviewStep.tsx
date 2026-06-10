@@ -11,6 +11,7 @@ import { useAppState, useAppDispatch } from '../store/AppStateContext';
 import PreviewGrid from './PreviewGrid';
 import CardEditDialog from './CardEditDialog';
 import WebcamCapture from './WebcamCapture';
+import ImageCropDialog from './ImageCropDialog';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96, 192];
 
@@ -19,6 +20,7 @@ export default function PreviewStep() {
   const dispatch = useAppDispatch();
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [webcamOpen, setWebcamOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(24);
 
@@ -64,14 +66,27 @@ export default function PreviewStep() {
     setWebcamOpen(true);
   };
 
+  const handlePhotoReady = (dataUrl: string) => {
+    setCropSrc(dataUrl);
+  };
+
   const handleWebcamCapture = (dataUrl: string) => {
+    setWebcamOpen(false);
+    setCropSrc(dataUrl);
+  };
+
+  const handleCropConfirm = (croppedUrl: string) => {
     if (editIndex == null) return;
     dispatch({
       type: 'UPDATE_RECORD_OVERRIDES',
-      payload: { index: editIndex, overrides: { [imageBinding]: dataUrl } },
+      payload: { index: editIndex, overrides: { [imageBinding]: croppedUrl } },
     });
-    setWebcamOpen(false);
+    setCropSrc(null);
     setEditIndex(null);
+  };
+
+  const handleCropClose = () => {
+    setCropSrc(null);
   };
 
   return (
@@ -176,12 +191,20 @@ export default function PreviewStep() {
         bindings={bindings}
         onSave={handleSaveOverrides}
         onTakePhoto={handleTakePhotoFromDialog}
+        onPhotoReady={handlePhotoReady}
       />
 
       <WebcamCapture
         open={webcamOpen}
         onClose={() => setWebcamOpen(false)}
         onCapture={handleWebcamCapture}
+      />
+
+      <ImageCropDialog
+        open={cropSrc != null}
+        imageSrc={cropSrc}
+        onClose={handleCropClose}
+        onCrop={handleCropConfirm}
       />
     </Box>
   );

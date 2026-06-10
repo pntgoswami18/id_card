@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -15,6 +15,7 @@ interface CardEditDialogProps {
   bindings: { elementId: string; binding: string }[];
   onSave: (overrides: Record<string, string | null>) => void;
   onTakePhoto: () => void;
+  onPhotoReady: (dataUrl: string) => void;
 }
 
 function getValue(record: CardRecord | null, binding: string): string {
@@ -30,8 +31,30 @@ export default function CardEditDialog({
   bindings,
   onSave,
   onTakePhoto,
+  onPhotoReady,
 }: CardEditDialogProps) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image must be under 10 MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result;
+      if (typeof result === 'string') onPhotoReady(result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (!record) return;
@@ -73,9 +96,21 @@ export default function CardEditDialog({
               onChange={(e) => handleChange(binding, e.target.value)}
             />
           ))}
-          <Button variant="outlined" onClick={onTakePhoto}>
-            Take Photo
-          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button variant="outlined" fullWidth onClick={onTakePhoto}>
+              Take Photo
+            </Button>
+            <Button variant="outlined" fullWidth onClick={() => fileInputRef.current?.click()}>
+              Upload Photo
+            </Button>
+          </Box>
         </Box>
       </DialogContent>
       <DialogActions>
