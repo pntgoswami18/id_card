@@ -8,6 +8,8 @@ export interface WorkspaceMeta {
   name: string;
   /** Data URL or image URL for workspace logo. */
   logo?: string;
+  /** If set, this workspace is a child of the given parent. Max one level deep. */
+  parentId?: string;
 }
 
 export interface WorkspaceListState {
@@ -158,6 +160,43 @@ const emptyTemplate: Template = {
   background: null,
   watermark: null,
 };
+
+/** Returns the direct children of a parent workspace. */
+export function getChildWorkspaces(parentId: string): WorkspaceMeta[] {
+  return getWorkspaceList().workspaces.filter((w) => w.parentId === parentId);
+}
+
+/** Creates a sub-workspace under the given parent. Switches to it as current. */
+export function createSubWorkspace(name: string, parentId: string, logo?: string): WorkspaceMeta {
+  const list = getWorkspaceList();
+  const id = createWorkspaceId();
+  const meta: WorkspaceMeta = { id, name, parentId, ...(logo != null && logo !== '' && { logo }) };
+  list.workspaces = [...list.workspaces, meta];
+  list.currentId = id;
+  saveWorkspaceList(list);
+  return meta;
+}
+
+/**
+ * Deletes a workspace and all its direct children.
+ * After deletion the current workspace is reset to the first remaining workspace.
+ */
+export function deleteWorkspaceTree(id: string): void {
+  const list = getWorkspaceList();
+  const childIds = list.workspaces.filter((w) => w.parentId === id).map((w) => w.id);
+  const toDelete = new Set([id, ...childIds]);
+  list.workspaces = list.workspaces.filter((w) => !toDelete.has(w.id));
+  if (toDelete.has(list.currentId) || !list.workspaces.some((w) => w.id === list.currentId)) {
+    if (list.workspaces.length > 0) {
+      list.currentId = list.workspaces[0].id;
+    } else {
+      list.workspaces = [{ id: 'default', name: 'Default' }];
+      list.currentId = 'default';
+    }
+  }
+  saveWorkspaceList(list);
+  toDelete.forEach((delId) => localStorage.removeItem(DATA_PREFIX + delId));
+}
 
 /** Default data for a new workspace. */
 export function getDefaultWorkspaceData(): WorkspaceData {
