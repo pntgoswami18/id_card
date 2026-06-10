@@ -767,7 +767,7 @@ export default function CardCanvas({
         )
       ) : el.type === 'image' ? (
         getFieldValue(record, el.binding) ? (
-          <img src={getFieldValue(record, el.binding)!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+          <img src={getFieldValue(record, el.binding)!} alt="" style={{ width: '100%', height: '100%', objectFit: el.objectFit ?? 'cover', pointerEvents: 'none' }} />
         ) : (
           <div
             style={{

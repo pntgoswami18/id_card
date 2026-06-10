@@ -26,6 +26,8 @@ export interface TextElement extends BaseElement {
 export interface ImageElement extends BaseElement {
   type: 'image';
   placeholder?: string; // e.g. 'Photo'
+  /** CSS object-fit for the rendered image. Defaults to 'cover'. */
+  objectFit?: 'cover' | 'contain' | 'fill';
 }
 
 /** Static text label; not bound to CSV data. */

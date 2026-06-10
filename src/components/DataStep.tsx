@@ -12,16 +12,17 @@ import type { CardRecord } from '../types';
 import { generateId } from '../utils/id';
 
 export default function DataStep() {
-  const { template, columnMapping } = useAppState();
+  const { template, columnMapping, csvData } = useAppState();
   const dispatch = useAppDispatch();
-  const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity?: 'error' | 'success' }>({
     open: false,
     message: '',
   });
 
+  const parsed: ParsedCsv | null = csvData;
+
   const handleParsed = (data: ParsedCsv) => {
-    setParsed(data);
+    dispatch({ type: 'SET_CSV_DATA', payload: data });
     const initialMapping: Record<string, string> = {};
     template.elements.forEach((e) => {
       if (e.binding && data.headers.includes(e.binding)) {
@@ -91,7 +92,7 @@ export default function DataStep() {
             size="small"
             sx={{ mt: 2 }}
             onClick={() => {
-              setParsed(null);
+              dispatch({ type: 'SET_CSV_DATA', payload: null });
               dispatch({ type: 'SET_COLUMN_MAPPING', payload: {} });
               dispatch({ type: 'SET_RECORDS', payload: [] });
             }}

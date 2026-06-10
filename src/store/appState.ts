@@ -8,6 +8,7 @@ import type {
   BackgroundConfig,
   WatermarkConfig,
 } from '../types';
+import type { ParsedCsv } from '../utils/csv';
 import type { WorkspaceMeta, WorkspaceData } from '../utils/workspaceStorage';
 
 export interface AppState {
@@ -26,6 +27,8 @@ export interface AppState {
   workspaceList: WorkspaceMeta[];
   /** Logo (data URL or image URL) for the current workspace. */
   currentWorkspaceLogo?: string;
+  /** Parsed CSV kept in memory so the Data step survives navigation. Not persisted to localStorage. */
+  csvData: ParsedCsv | null;
 }
 
 export type AppAction =
@@ -49,7 +52,8 @@ export type AppAction =
   | { type: 'LOAD_WORKSPACE_STATE'; payload: Partial<WorkspaceData> }
   | { type: 'SET_CURRENT_WORKSPACE'; payload: string }
   | { type: 'SET_WORKSPACE_LIST'; payload: WorkspaceMeta[] }
-  | { type: 'SET_WORKSPACE_LOGO'; payload: string | undefined };
+  | { type: 'SET_WORKSPACE_LOGO'; payload: string | undefined }
+  | { type: 'SET_CSV_DATA'; payload: ParsedCsv | null };
 
 const defaultPrintSettings: PrintSettings = {
   widthMm: 85.6,
@@ -78,6 +82,7 @@ export const initialState: AppState = {
   currentWorkspaceId: '',
   workspaceList: [],
   currentWorkspaceLogo: undefined,
+  csvData: null,
 };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -112,7 +117,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case 'UPDATE_TEMPLATE_WATERMARK':
       return { ...state, template: { ...state.template, watermark: action.payload } };
     case 'SET_RECORDS':
-      return { ...state, records: action.payload, selectedCardIndices: [] };
+      // Clear csvData when records are cleared (e.g. workspace load), keep it when generating cards
+      return {
+        ...state,
+        records: action.payload,
+        selectedCardIndices: [],
+        ...(action.payload.length === 0 && { csvData: null }),
+      };
     case 'UPDATE_RECORD_OVERRIDES': {
       const { index, overrides } = action.payload;
       const records = [...state.records];
@@ -164,6 +175,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, workspaceList: action.payload };
     case 'SET_WORKSPACE_LOGO':
       return { ...state, currentWorkspaceLogo: action.payload };
+    case 'SET_CSV_DATA':
+      return { ...state, csvData: action.payload };
     default:
       return state;
   }

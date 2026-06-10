@@ -286,14 +286,28 @@ export default function ElementPropertiesPanel({
         </>
       )}
       {element.type === 'image' && (
-        <TextField
-          fullWidth
-          size="small"
-          label="Placeholder text"
-          value={(element as ImageElement).placeholder ?? 'Photo'}
-          onChange={(e) => onUpdate({ placeholder: e.target.value })}
-          sx={{ mb: 1 }}
-        />
+        <>
+          <TextField
+            fullWidth
+            size="small"
+            label="Placeholder text"
+            value={(element as ImageElement).placeholder ?? 'Photo'}
+            onChange={(e) => onUpdate({ placeholder: e.target.value })}
+            sx={{ mb: 1 }}
+          />
+          <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+            <InputLabel>Image fit</InputLabel>
+            <Select
+              value={(element as ImageElement).objectFit ?? 'cover'}
+              label="Image fit"
+              onChange={(e) => onUpdate({ objectFit: e.target.value as ImageElement['objectFit'] })}
+            >
+              <MenuItem value="cover">Cover (fill, may crop)</MenuItem>
+              <MenuItem value="contain">Contain (show full image)</MenuItem>
+              <MenuItem value="fill">Fill (stretch to fit)</MenuItem>
+            </Select>
+          </FormControl>
+        </>
       )}
       {onDuplicate && (
         <Button fullWidth variant="outlined" size="small" sx={{ mt: 2 }} onClick={onDuplicate}>
