@@ -17,6 +17,36 @@ interface PrintSettingsProps {
   onPresetsChange: (presets: PrintPreset[]) => void;
   /** When false, orientation selector is hidden (e.g. on Print step; orientation is set on Design step). */
   showOrientation?: boolean;
+  /** Card dimensions (oriented) in mm — used to show layout summary. */
+  cardWidthMm?: number;
+  cardHeightMm?: number;
+}
+
+const PAPER_SIZES = [
+  { id: 'a4', label: 'A4 (210 × 297 mm)', width: 210, height: 297 },
+  { id: 'a3', label: 'A3 (297 × 420 mm)', width: 297, height: 420 },
+  { id: 'letter', label: 'Letter (216 × 279 mm)', width: 216, height: 279 },
+  { id: 'legal', label: 'Legal (216 × 356 mm)', width: 216, height: 356 },
+  { id: 'custom', label: 'Custom', width: 0, height: 0 },
+] as const;
+
+function detectPaperSizeId(w: number, h: number): string {
+  const match = PAPER_SIZES.find((p) => p.id !== 'custom' && p.width === w && p.height === h);
+  return match ? match.id : 'custom';
+}
+
+export function computeLayout(
+  paperW: number,
+  paperH: number,
+  cardW: number,
+  cardH: number,
+  margin: number,
+): { cols: number; rows: number; perPage: number } {
+  const usableW = paperW - 2 * margin;
+  const usableH = paperH - 2 * margin;
+  const cols = Math.max(1, Math.floor(usableW / cardW));
+  const rows = Math.max(1, Math.floor(usableH / cardH));
+  return { cols, rows, perPage: cols * rows };
 }
 
 export default function PrintSettingsComponent({
@@ -25,11 +55,25 @@ export default function PrintSettingsComponent({
   onSettingsChange,
   onPresetsChange,
   showOrientation = true,
+  cardWidthMm,
+  cardHeightMm,
 }: PrintSettingsProps) {
   useEffect(() => {
     onPresetsChange(loadPrintPresets());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const paperW = settings.paperWidthMm ?? 210;
+  const paperH = settings.paperHeightMm ?? 297;
+  const margin = settings.pageMarginMm ?? 5;
+  const sizeId = detectPaperSizeId(paperW, paperH);
+
+  const handlePaperSizeSelect = (id: string) => {
+    const preset = PAPER_SIZES.find((p) => p.id === id);
+    if (preset && preset.id !== 'custom') {
+      onSettingsChange({ paperWidthMm: preset.width, paperHeightMm: preset.height });
+    }
+  };
 
   const handleSavePreset = () => {
     const name = prompt('Preset name');
@@ -59,12 +103,77 @@ export default function PrintSettingsComponent({
     onPresetsChange(loadPrintPresets());
   };
 
+  const layoutSummary =
+    cardWidthMm && cardHeightMm && cardWidthMm > 0 && cardHeightMm > 0
+      ? computeLayout(paperW, paperH, cardWidthMm, cardHeightMm, margin)
+      : null;
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Paper size */}
+      <Box>
+        <Typography variant="subtitle2" gutterBottom>
+          Paper size
+        </Typography>
+        <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+          <InputLabel>Paper size</InputLabel>
+          <Select
+            value={sizeId}
+            label="Paper size"
+            onChange={(e) => handlePaperSizeSelect(e.target.value)}
+          >
+            {PAPER_SIZES.map((p) => (
+              <MenuItem key={p.id} value={p.id}>
+                {p.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        {sizeId === 'custom' && (
+          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            <TextField
+              size="small"
+              label="Paper width (mm)"
+              type="number"
+              value={paperW}
+              onChange={(e) => onSettingsChange({ paperWidthMm: parseFloat(e.target.value) || 210 })}
+              inputProps={{ min: 50, max: 2000, step: 0.5 }}
+              sx={{ flex: 1 }}
+            />
+            <TextField
+              size="small"
+              label="Paper height (mm)"
+              type="number"
+              value={paperH}
+              onChange={(e) => onSettingsChange({ paperHeightMm: parseFloat(e.target.value) || 297 })}
+              inputProps={{ min: 50, max: 2000, step: 0.5 }}
+              sx={{ flex: 1 }}
+            />
+          </Box>
+        )}
+        <TextField
+          size="small"
+          label="Page margin (mm)"
+          type="number"
+          value={margin}
+          onChange={(e) => onSettingsChange({ pageMarginMm: parseFloat(e.target.value) ?? 5 })}
+          inputProps={{ min: 0, max: 50, step: 0.5 }}
+          fullWidth
+          sx={{ mb: 0.5 }}
+        />
+        {layoutSummary && (
+          <Typography variant="caption" color="text.secondary">
+            {layoutSummary.cols} × {layoutSummary.rows} = {layoutSummary.perPage} card
+            {layoutSummary.perPage !== 1 ? 's' : ''} per sheet
+          </Typography>
+        )}
+      </Box>
+
+      {/* Card size */}
       <Box>
         <Typography variant="subtitle2">Card size (mm)</Typography>
-        <Typography variant="caption" color="text.secondary">
-          Each card prints on its own page at these exact dimensions.
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+          Each card is printed at these exact dimensions.
         </Typography>
       </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>

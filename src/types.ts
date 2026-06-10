@@ -119,6 +119,11 @@ export interface PrintSettings {
   widthMm: number;
   heightMm: number;
   orientation: 'portrait' | 'landscape';
+  /** Paper dimensions. Defaults to A4 (210×297) if not set. */
+  paperWidthMm?: number;
+  paperHeightMm?: number;
+  /** Page margin in mm (applied on all four sides). Defaults to 5. */
+  pageMarginMm?: number;
 }
 
 // User-saved template (stored in localStorage)

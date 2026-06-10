@@ -1,51 +1,80 @@
 import Box from '@mui/material/Box';
 import CardCanvas from './CardCanvas';
+import { computeLayout } from './PrintSettings';
 import type { Template, CardRecord } from '../types';
 
 interface PrintViewProps {
   template: Template;
   records: CardRecord[];
   indices: number[];
-  widthMm: number;
-  heightMm: number;
+  /** Oriented card dimensions in mm. */
+  cardWidthMm: number;
+  cardHeightMm: number;
+  paperWidthMm: number;
+  paperHeightMm: number;
+  pageMarginMm: number;
 }
 
 export default function PrintView({
   template,
   records,
   indices,
-  widthMm,
-  heightMm,
+  cardWidthMm,
+  cardHeightMm,
+  paperWidthMm,
+  paperHeightMm,
+  pageMarginMm,
 }: PrintViewProps) {
-  const cardsToPrint = indices
-    .filter((i) => records[i])
-    .map((i) => records[i]);
+  const cardsToPrint = indices.filter((i) => records[i]).map((i) => records[i]);
+
+  const { cols, rows, perPage } = computeLayout(
+    paperWidthMm,
+    paperHeightMm,
+    cardWidthMm,
+    cardHeightMm,
+    pageMarginMm,
+  );
+
+  // Split into pages
+  const pages: CardRecord[][] = [];
+  for (let i = 0; i < cardsToPrint.length; i += perPage) {
+    pages.push(cardsToPrint.slice(i, i + perPage));
+  }
+  if (pages.length === 0) pages.push([]);
 
   return (
-    <Box
-      id="print-view-content"
-      sx={{
-        '& > div': {
-          breakAfter: 'page',
-          pageBreakAfter: 'always',
-        },
-      }}
-    >
-      {cardsToPrint.map((record) => (
+    <Box id="print-view-content">
+      {pages.map((pageCards, pageIdx) => (
         <Box
-          key={record.id}
+          key={pageIdx}
           sx={{
-            width: `${widthMm}mm`,
-            height: `${heightMm}mm`,
+            width: `${paperWidthMm}mm`,
+            height: `${paperHeightMm}mm`,
+            padding: `${pageMarginMm}mm`,
+            boxSizing: 'border-box',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${cols}, ${cardWidthMm}mm)`,
+            gridTemplateRows: `repeat(${rows}, ${cardHeightMm}mm)`,
+            alignContent: 'start',
+            justifyContent: 'start',
+            breakAfter: 'page',
+            pageBreakAfter: 'always',
           }}
         >
-          <CardCanvas
-            template={template}
-            record={record}
-            widthMm={widthMm}
-            heightMm={heightMm}
-            designMode={false}
-          />
+          {pageCards.map((record) => (
+            <Box
+              key={record.id}
+              sx={{ width: `${cardWidthMm}mm`, height: `${cardHeightMm}mm` }}
+            >
+              <CardCanvas
+                template={template}
+                record={record}
+                widthMm={cardWidthMm}
+                heightMm={cardHeightMm}
+                designMode={false}
+              />
+            </Box>
+          ))}
         </Box>
       ))}
     </Box>
