@@ -46,6 +46,9 @@ export default function PreviewStep() {
     .filter((e) => e.binding)
     .map((e) => ({ elementId: e.id, binding: e.binding! }));
 
+  const imageBinding =
+    template.elements.find((e) => e.type === 'image' && e.binding)?.binding ?? 'photo';
+
   const editRecord = editIndex != null ? records[editIndex] : null;
 
   const handleCardClick = (index: number) => {
@@ -65,7 +68,7 @@ export default function PreviewStep() {
     if (editIndex == null) return;
     dispatch({
       type: 'UPDATE_RECORD_OVERRIDES',
-      payload: { index: editIndex, overrides: { photo: dataUrl } },
+      payload: { index: editIndex, overrides: { [imageBinding]: dataUrl } },
     });
     setWebcamOpen(false);
     setEditIndex(null);

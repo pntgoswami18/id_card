@@ -9,10 +9,7 @@ import CsvUpload from './CsvUpload';
 import ColumnMapping from './ColumnMapping';
 import type { ParsedCsv } from '../utils/csv';
 import type { CardRecord } from '../types';
-
-function generateRecordId(): string {
-  return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
+import { generateId } from '../utils/id';
 
 export default function DataStep() {
   const { template, columnMapping } = useAppState();
@@ -44,6 +41,10 @@ export default function DataStep() {
 
   const handleGenerate = () => {
     if (!parsed) return;
+    if (parsed.rows.length === 0) {
+      setSnackbar({ open: true, message: 'The CSV file has no data rows.', severity: 'error' });
+      return;
+    }
     const records: CardRecord[] = parsed.rows.map((row) => {
       const data: Record<string, string | null> = {};
       Object.keys(columnMapping).forEach((field) => {
@@ -51,7 +52,7 @@ export default function DataStep() {
         data[field] = col && row[col] != null ? String(row[col]) : null;
       });
       return {
-        id: generateRecordId(),
+        id: generateId('rec'),
         data,
         overrides: {},
       };
@@ -89,7 +90,11 @@ export default function DataStep() {
             variant="outlined"
             size="small"
             sx={{ mt: 2 }}
-            onClick={() => setParsed(null)}
+            onClick={() => {
+              setParsed(null);
+              dispatch({ type: 'SET_COLUMN_MAPPING', payload: {} });
+              dispatch({ type: 'SET_RECORDS', payload: [] });
+            }}
           >
             Upload Different File
           </Button>

@@ -90,9 +90,21 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, template: { ...state.template, elements: action.payload } };
     case 'UPDATE_TEMPLATE_ELEMENT': {
       const { id, updates } = action.payload;
-      const elements = state.template.elements.map((el) =>
-        el.id === id ? { ...el, ...updates } as TemplateElement : el
-      );
+      const elements = state.template.elements.map((el) => {
+        if (el.id !== id) return el;
+        const safeUpdates = { ...updates } as Record<string, unknown>;
+        if (el.type === 'image') {
+          delete safeUpdates.fontSize;
+          delete safeUpdates.fontSizeAuto;
+          delete safeUpdates.fontWeight;
+          delete safeUpdates.fontFamily;
+          delete safeUpdates.color;
+          delete safeUpdates.value;
+        } else if (el.type !== 'label') {
+          delete safeUpdates.value;
+        }
+        return { ...el, ...safeUpdates } as TemplateElement;
+      });
       return { ...state, template: { ...state.template, elements } };
     }
     case 'UPDATE_TEMPLATE_BACKGROUND':

@@ -399,6 +399,7 @@ export default function CardCanvas({
   const marqueeStateRef = useRef<MarqueeState | null>(null);
   const onElementUpdateRef = useRef(onElementUpdate);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onWatermarkChangeRef = useRef(onWatermarkChange);
   const templateRef = useRef(template);
 
   dragStateRef.current = dragState;
@@ -408,6 +409,7 @@ export default function CardCanvas({
   marqueeStateRef.current = marqueeState;
   onElementUpdateRef.current = onElementUpdate;
   onSelectionChangeRef.current = onSelectionChange;
+  onWatermarkChangeRef.current = onWatermarkChange;
   templateRef.current = template;
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -420,7 +422,7 @@ export default function CardCanvas({
     const wmDrag = wmDragStateRef.current;
     const wmResize = wmResizeStateRef.current;
     const wm = templateRef.current.watermark;
-    const onWmChange = onWatermarkChange;
+    const onWmChange = onWatermarkChangeRef.current;
 
     if (wm && onWmChange && (wmDrag || wmResize)) {
       const bounds = wmDrag?.bounds ?? wmResize?.bounds;

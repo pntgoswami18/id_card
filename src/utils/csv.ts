@@ -11,8 +11,9 @@ export function parseCsv(file: File): Promise<ParsedCsv> {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        if (results.errors.length > 0) {
-          reject(new Error(results.errors.map((e) => e.message).join('; ')));
+        const fatalErrors = results.errors.filter((e) => e.type !== 'FieldMismatch');
+        if (fatalErrors.length > 0) {
+          reject(new Error(fatalErrors.map((e) => e.message).join('; ')));
           return;
         }
         const rows = (results.data || []) as Record<string, string>[];

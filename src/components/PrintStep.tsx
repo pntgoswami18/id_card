@@ -12,6 +12,8 @@ export default function PrintStep() {
 
   const wMm = printSettings.orientation === 'portrait' ? printSettings.heightMm : printSettings.widthMm;
   const hMm = printSettings.orientation === 'portrait' ? printSettings.widthMm : printSettings.heightMm;
+  const safeWMm = Number.isFinite(wMm) ? wMm : 85.6;
+  const safeHMm = Number.isFinite(hMm) ? hMm : 53.98;
 
   const printIndices =
     selectedCardIndices.length > 0 ? selectedCardIndices : records.map((_, i) => i);
@@ -35,8 +37,8 @@ export default function PrintStep() {
           template={template}
           records={records}
           indices={printIndices}
-          widthMm={wMm}
-          heightMm={hMm}
+          widthMm={safeWMm}
+          heightMm={safeHMm}
         />
       </Box>
 
@@ -50,7 +52,7 @@ export default function PrintStep() {
             left: 0 !important;
             top: 0 !important;
           }
-          @page { size: ${wMm}mm ${hMm}mm; margin: 0; }
+          @page { size: ${safeWMm}mm ${safeHMm}mm; margin: 0; }
           body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>

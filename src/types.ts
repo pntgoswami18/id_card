@@ -117,9 +117,6 @@ export interface PrintSettings {
   orientation: 'portrait' | 'landscape';
 }
 
-// Built-in template id
-export type BuiltInTemplateId = string;
-
 // User-saved template (stored in localStorage)
 export interface UserTemplateMeta {
   id: string;

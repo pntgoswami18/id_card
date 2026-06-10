@@ -1,7 +1,7 @@
 import type { Template, CardRecord, ColumnMapping, PrintPreset, PrintSettings } from '../types';
 
-const LIST_KEY = 'id_card_workspace_list';
-const DATA_PREFIX = 'id_card_workspace_data_';
+export const LIST_KEY = 'id_card_workspace_list';
+export const DATA_PREFIX = 'id_card_workspace_data_';
 
 export interface WorkspaceMeta {
   id: string;
@@ -54,7 +54,11 @@ export function getWorkspaceList(): WorkspaceListState {
 }
 
 export function saveWorkspaceList(state: WorkspaceListState): void {
-  localStorage.setItem(LIST_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(LIST_KEY, JSON.stringify(state));
+  } catch {
+    console.warn('Storage quota exceeded: workspace list could not be saved.');
+  }
 }
 
 export function getWorkspaceData(id: string): WorkspaceData | null {
@@ -68,7 +72,11 @@ export function getWorkspaceData(id: string): WorkspaceData | null {
 }
 
 export function saveWorkspaceData(id: string, data: WorkspaceData): void {
-  localStorage.setItem(DATA_PREFIX + id, JSON.stringify(data));
+  try {
+    localStorage.setItem(DATA_PREFIX + id, JSON.stringify(data));
+  } catch {
+    console.warn('Storage quota exceeded: workspace data could not be saved. Consider removing large images.');
+  }
   if (data.logo !== undefined) {
     updateWorkspaceMeta(id, { logo: data.logo });
   }

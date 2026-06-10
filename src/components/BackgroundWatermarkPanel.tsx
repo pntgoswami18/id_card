@@ -51,6 +51,11 @@ export default function BackgroundWatermarkPanel({
   const handleBackgroundFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Background image must be under 2 MB.');
+      e.target.value = '';
+      return;
+    }
     try {
       const dataUrl = await readFileAsDataUrl(file);
       onBackgroundChange({
@@ -66,6 +71,11 @@ export default function BackgroundWatermarkPanel({
   const handleWatermarkFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Watermark image must be under 2 MB.');
+      e.target.value = '';
+      return;
+    }
     try {
       const dataUrl = await readFileAsDataUrl(file);
       onWatermarkChange(

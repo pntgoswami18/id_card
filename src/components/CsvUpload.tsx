@@ -18,14 +18,22 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+    if (!file.type.includes('csv') && !file.name.endsWith('.csv')) {
+      onError?.(new Error('Please select a CSV file.'));
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      onError?.(new Error('CSV file must be under 50 MB.'));
+      return;
+    }
     try {
       const data = await parseCsv(file);
       onParsed(data);
     } catch (err) {
       onError?.(err instanceof Error ? err : new Error(String(err)));
     }
-    e.target.value = '';
   };
 
   const uniqueOrderedColumns = [...new Set(expectedColumns)];

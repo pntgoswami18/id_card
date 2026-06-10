@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -36,6 +37,8 @@ export default function PreviewGrid({
   const scale = CARD_PREVIEW_WIDTH_PX / canvasWidthPx;
   const previewHeightPx = canvasHeightPx * scale;
 
+  const selectedSet = useMemo(() => new Set(selectedIndices), [selectedIndices]);
+
   if (records.length === 0) {
     return null;
   }
@@ -55,8 +58,8 @@ export default function PreviewGrid({
           key={record.id}
           sx={{
             cursor: 'pointer',
-            border: selectedIndices.includes(globalIndex) ? '2px solid' : '1px solid',
-            borderColor: selectedIndices.includes(globalIndex) ? 'primary.main' : 'divider',
+            border: selectedSet.has(globalIndex) ? '2px solid' : '1px solid',
+            borderColor: selectedSet.has(globalIndex) ? 'primary.main' : 'divider',
           }}
           onClick={() => onCardClick(globalIndex)}
         >
@@ -64,7 +67,7 @@ export default function PreviewGrid({
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
               <Checkbox
                 size="small"
-                checked={selectedIndices.includes(globalIndex)}
+                checked={selectedSet.has(globalIndex)}
                 onChange={(e) => {
                   e.stopPropagation();
                   onToggleSelect(globalIndex);

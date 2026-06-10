@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef, Component, type ReactNode } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -10,6 +10,23 @@ import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+
+class StepErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <Box sx={{ p: 3 }}>
+          <Typography color="error" variant="h6">Something went wrong in this step.</Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>{(this.state.error as Error).message}</Typography>
+          <Button sx={{ mt: 2 }} onClick={() => this.setState({ error: null })}>Try Again</Button>
+        </Box>
+      );
+    }
+    return this.props.children;
+  }
+}
 import theme from './theme';
 import { AppStateProvider, useAppState, useAppDispatch } from './store/AppStateContext';
 import {
@@ -140,16 +157,21 @@ function AppContent() {
           />
         </Box>
         <Stepper activeStep={activeStep} sx={{ pt: 2, pb: 4, flexShrink: 0 }} aria-label="Workflow steps">
-          {steps.map((label, index) => (
-            <Step key={label} completed={index < activeStep}>
-              <StepButton
-                onClick={() => dispatch({ type: 'SET_ACTIVE_STEP', payload: index })}
-                aria-label={`Go to ${label} step`}
-              >
-                <StepLabel>{label}</StepLabel>
-              </StepButton>
-            </Step>
-          ))}
+          {steps.map((label, index) => {
+            const needsRecords = index >= 2;
+            const isDisabled = needsRecords && records.length === 0;
+            return (
+              <Step key={label} completed={index < activeStep}>
+                <StepButton
+                  onClick={() => !isDisabled && dispatch({ type: 'SET_ACTIVE_STEP', payload: index })}
+                  disabled={isDisabled}
+                  aria-label={`Go to ${label} step`}
+                >
+                  <StepLabel>{label}</StepLabel>
+                </StepButton>
+              </Step>
+            );
+          })}
         </Stepper>
         {activeStep > 0 && (
           <Box sx={{ mb: 2, flexShrink: 0 }}>
@@ -173,7 +195,9 @@ function AppContent() {
           }}
         >
           <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', py: 8, flex: 1 }}><CircularProgress /></Box>}>
-            {stepContent[activeStep]}
+            <StepErrorBoundary key={activeStep}>
+              {stepContent[activeStep]}
+            </StepErrorBoundary>
           </Suspense>
         </Box>
       </Paper>

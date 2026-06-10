@@ -25,12 +25,9 @@ import BackgroundWatermarkPanel from './BackgroundWatermarkPanel';
 import { ElementPropertiesPanel } from './DesignEditor';
 import { saveUserTemplate } from '../utils/userTemplates';
 import type { Template, TemplateElement } from '../types';
+import { generateId } from '../utils/id';
 
 const COMMON_BINDINGS = ['name', 'id', 'photo', 'department', 'company', 'course', 'date'];
-
-function generateId(): string {
-  return `el-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
 
 const OFFSET_PASTE = 5;
 
@@ -47,7 +44,7 @@ export default function DesignStep() {
   const copiedElementsRef = useRef<TemplateElement[] | null>(null);
 
   const selectedElements = template.elements.filter((e) => selectedElementIds.includes(e.id));
-  const selectedElement = selectedElements.length === 1 ? selectedElements[0] : selectedElements[0] ?? null;
+  const selectedElement = selectedElements.length === 1 ? selectedElements[0] : null;
   const bindingsFromElements = template.elements.map((e) => e.binding).filter((b): b is string => !!b);
   const availableBindings = [...new Set([...COMMON_BINDINGS, ...bindingsFromElements])];
 

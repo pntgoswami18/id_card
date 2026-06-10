@@ -67,7 +67,12 @@ export default function ColumnMappingComponent({
           </FormControl>
         ))}
       </Box>
-      <Button variant="contained" sx={{ mt: 2 }} onClick={onGenerate}>
+      <Button
+        variant="contained"
+        sx={{ mt: 2 }}
+        onClick={onGenerate}
+        disabled={!uniqueBindings.some((b) => !!mapping[b])}
+      >
         Generate Cards
       </Button>
     </Box>

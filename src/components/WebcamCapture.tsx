@@ -22,18 +22,25 @@ export default function WebcamCapture({ open, onClose, onCapture }: WebcamCaptur
   useEffect(() => {
     if (!open) return;
     setError(null);
+    let mounted = true;
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: 'user' } })
       .then((stream) => {
+        if (!mounted) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
       })
       .catch((err) => {
+        if (!mounted) return;
         setError(err.message || 'Could not access camera');
       });
     return () => {
+      mounted = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };

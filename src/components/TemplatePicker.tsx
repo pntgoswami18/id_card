@@ -23,9 +23,8 @@ interface TemplatePickerProps {
 }
 
 export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete }: TemplatePickerProps) {
-  const [refresh, setRefresh] = useState(0);
+  const [userTemplates, setUserTemplates] = useState(() => loadUserTemplates());
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
-  const userTemplates = loadUserTemplates();
 
   const handleSelectBuiltIn = (t: Template) => {
     onSelect(t, { type: 'built-in', id: t.id });
@@ -45,9 +44,9 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
   const handleDeleteConfirm = () => {
     if (!deleteConfirm) return;
     deleteUserTemplate(deleteConfirm.id);
+    setUserTemplates((prev) => prev.filter((t) => t.meta.id !== deleteConfirm.id));
     onAfterDelete?.(deleteConfirm.id);
     setDeleteConfirm(null);
-    setRefresh((r) => r + 1);
   };
 
   return (
@@ -72,7 +71,7 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
             <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2, mb: 0.5 }}>
               My templates
             </Typography>
-            <List dense key={refresh}>
+            <List dense>
               {userTemplates.map(({ meta, template }) => (
                 <ListItem
                   key={meta.id}

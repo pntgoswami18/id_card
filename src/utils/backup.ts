@@ -1,6 +1,6 @@
-import { getWorkspaceList, getWorkspaceData } from './workspaceStorage';
-import { loadUserTemplates } from './userTemplates';
-import { loadPrintPresets } from './printPresets';
+import { getWorkspaceList, getWorkspaceData, LIST_KEY, DATA_PREFIX } from './workspaceStorage';
+import { loadUserTemplates, STORAGE_KEY as USER_TEMPLATES_KEY } from './userTemplates';
+import { loadPrintPresets, STORAGE_KEY as PRINT_PRESETS_KEY } from './printPresets';
 import type { WorkspaceListState, WorkspaceData } from './workspaceStorage';
 import type { PrintPreset } from '../types';
 
@@ -14,7 +14,7 @@ export interface BackupData {
   printPresets: PrintPreset[];
 }
 
-function isBackupData(obj: unknown): obj is BackupData {
+export function isBackupData(obj: unknown): obj is BackupData {
   if (!obj || typeof obj !== 'object') return false;
   const o = obj as Record<string, unknown>;
   return (
@@ -73,16 +73,16 @@ export function restoreFromBackup(backup: BackupData): RestoreResult {
 
     const { workspaceList, workspaceData, userTemplates, printPresets } = backup;
 
-    localStorage.setItem('id_card_workspace_list', JSON.stringify(workspaceList));
+    localStorage.setItem(LIST_KEY, JSON.stringify(workspaceList));
 
     for (const [id, data] of Object.entries(workspaceData)) {
       if (data && typeof data === 'object' && data.template && Array.isArray(data.records)) {
-        localStorage.setItem(`id_card_workspace_data_${id}`, JSON.stringify(data));
+        localStorage.setItem(DATA_PREFIX + id, JSON.stringify(data));
       }
     }
 
-    localStorage.setItem('id-card-user-templates', JSON.stringify(userTemplates));
-    localStorage.setItem('id-card-print-presets', JSON.stringify(printPresets));
+    localStorage.setItem(USER_TEMPLATES_KEY, JSON.stringify(userTemplates));
+    localStorage.setItem(PRINT_PRESETS_KEY, JSON.stringify(printPresets));
 
     return { ok: true };
   } catch (err) {

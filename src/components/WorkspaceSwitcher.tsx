@@ -33,7 +33,7 @@ import {
   getDefaultWorkspaceData,
   saveWorkspaceData,
 } from '../utils/workspaceStorage';
-import { downloadBackup, restoreFromBackup, type BackupData } from '../utils/backup';
+import { downloadBackup, restoreFromBackup, isBackupData, type BackupData } from '../utils/backup';
 
 interface WorkspaceSwitcherProps {
   workspaceList: WorkspaceMeta[];
@@ -75,6 +75,8 @@ export default function WorkspaceSwitcher({
   const [editLogo, setEditLogo] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const pendingRestoreRef = useRef<BackupData | null>(null);
   const newLogoInputRef = useRef<HTMLInputElement>(null);
   const editLogoInputRef = useRef<HTMLInputElement>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
@@ -186,16 +188,29 @@ export default function WorkspaceSwitcher({
     if (!file) return;
     try {
       const text = await file.text();
-      const backup = JSON.parse(text) as BackupData;
-      const result = restoreFromBackup(backup);
-      if (result.ok) {
-        window.location.reload();
-      } else {
-        setRestoreError(result.error);
+      const parsed = JSON.parse(text) as BackupData;
+      if (!isBackupData(parsed)) {
+        setRestoreError('Invalid backup file format.');
+        return;
       }
+      pendingRestoreRef.current = parsed;
+      setRestoreConfirmOpen(true);
     } catch {
       setRestoreError('Invalid backup file. Please select a valid JSON backup.');
     }
+  };
+
+  const handleRestoreConfirm = () => {
+    const backup = pendingRestoreRef.current;
+    if (!backup) return;
+    const result = restoreFromBackup(backup);
+    if (result.ok) {
+      window.location.reload();
+    } else {
+      setRestoreError(result.error);
+    }
+    setRestoreConfirmOpen(false);
+    pendingRestoreRef.current = null;
   };
 
   return (
@@ -288,6 +303,21 @@ export default function WorkspaceSwitcher({
         onChange={handleRestoreFileChange}
       />
 
+      <Dialog open={restoreConfirmOpen} onClose={() => { setRestoreConfirmOpen(false); pendingRestoreRef.current = null; }}>
+        <DialogTitle>Restore Backup?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            This will overwrite ALL workspaces and saved data with the backup. This cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setRestoreConfirmOpen(false); pendingRestoreRef.current = null; }}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleRestoreConfirm}>
+            Restore
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={Boolean(restoreError)} onClose={() => setRestoreError(null)}>
         <DialogTitle>Restore Failed</DialogTitle>
         <DialogContent>
@@ -322,8 +352,11 @@ export default function WorkspaceSwitcher({
               style={{ display: 'none' }}
               onChange={async (e) => {
                 const file = e.target.files?.[0];
-                if (file) setNewLogo(await readFileAsDataUrl(file));
                 e.target.value = '';
+                if (!file) return;
+                if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+                if (file.size > 1 * 1024 * 1024) { alert('Logo must be under 1 MB.'); return; }
+                setNewLogo(await readFileAsDataUrl(file));
               }}
             />
             {newLogo ? (
@@ -379,8 +412,11 @@ export default function WorkspaceSwitcher({
               style={{ display: 'none' }}
               onChange={async (e) => {
                 const file = e.target.files?.[0];
-                if (file) setEditLogo(await readFileAsDataUrl(file));
                 e.target.value = '';
+                if (!file) return;
+                if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+                if (file.size > 1 * 1024 * 1024) { alert('Logo must be under 1 MB.'); return; }
+                setEditLogo(await readFileAsDataUrl(file));
               }}
             />
             {editLogo ? (
