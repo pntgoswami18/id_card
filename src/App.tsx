@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, Component, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, Component, type ReactNode } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -35,6 +35,12 @@ import {
   saveWorkspaceData,
 } from './utils/workspaceStorage';
 import type { WorkspaceData, WorkspaceMeta } from './utils/workspaceStorage';
+import {
+  writeWorkspaceToHandle,
+  getAutoSavePref,
+  setAutoSavePref,
+  type WorkspaceFileHandle,
+} from './utils/workspaceFile';
 import WorkspaceSwitcher from './components/WorkspaceSwitcher';
 
 const DesignStep = lazy(() => import('./components/DesignStep'));
@@ -48,8 +54,9 @@ function AppContent() {
   const { activeStep, currentWorkspaceId, workspaceList, currentWorkspaceLogo, template, records, columnMapping, printPresets, printSettings, selectedCardIndices, currentTemplateSource } = useAppState();
   const dispatch = useAppDispatch();
   const hydratedRef = useRef(false);
-
   const skipAutoSaveRef = useRef(true);
+  const fileHandleRef = useRef<WorkspaceFileHandle | null>(null);
+  const [autoSaveToFile, setAutoSaveToFile] = useState(() => getAutoSavePref());
 
   useEffect(() => {
     if (hydratedRef.current) return;
@@ -63,27 +70,34 @@ function AppContent() {
     }
   }, [dispatch]);
 
+  const currentWorkspaceName = workspaceList.find((w) => w.id === currentWorkspaceId)?.name ?? 'Workspace';
+
   useEffect(() => {
     if (!currentWorkspaceId) return;
     if (skipAutoSaveRef.current) {
       skipAutoSaveRef.current = false;
       return;
     }
+    const data: WorkspaceData = {
+      template,
+      records,
+      columnMapping,
+      printPresets,
+      printSettings,
+      selectedCardIndices,
+      currentTemplateSource,
+      logo: currentWorkspaceLogo,
+    };
     const t = setTimeout(() => {
-      saveWorkspaceData(currentWorkspaceId, {
-        template,
-        records,
-        columnMapping,
-        printPresets,
-        printSettings,
-        selectedCardIndices,
-        currentTemplateSource,
-        logo: currentWorkspaceLogo,
-      });
+      saveWorkspaceData(currentWorkspaceId, data);
+      if (autoSaveToFile && fileHandleRef.current) {
+        void writeWorkspaceToHandle(fileHandleRef.current, currentWorkspaceName, data);
+      }
     }, 400);
     return () => clearTimeout(t);
   }, [
     currentWorkspaceId,
+    currentWorkspaceName,
     template,
     records,
     columnMapping,
@@ -92,6 +106,7 @@ function AppContent() {
     selectedCardIndices,
     currentTemplateSource,
     currentWorkspaceLogo,
+    autoSaveToFile,
   ]);
 
   const currentWorkspaceData: WorkspaceData = {
@@ -144,6 +159,9 @@ function AppContent() {
             currentWorkspaceId={currentWorkspaceId}
             currentWorkspaceData={currentWorkspaceData}
             currentWorkspaceLogo={currentWorkspaceLogo}
+            autoSaveToFile={autoSaveToFile}
+            onAutoSaveToFileChange={(v) => { setAutoSaveToFile(v); setAutoSavePref(v); }}
+            fileHandleRef={fileHandleRef}
             onSaveCurrent={(overrides?: Partial<WorkspaceData>) => {
               if (currentWorkspaceId) {
                 const data = overrides ? { ...currentWorkspaceData, ...overrides } : currentWorkspaceData;

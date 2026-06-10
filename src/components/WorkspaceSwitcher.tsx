@@ -13,14 +13,15 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
+import Switch from '@mui/material/Switch';
 import Avatar from '@mui/material/Avatar';
 import FolderOpen from '@mui/icons-material/FolderOpen';
 import Add from '@mui/icons-material/Add';
 import Edit from '@mui/icons-material/Edit';
 import Delete from '@mui/icons-material/Delete';
 import Image from '@mui/icons-material/Image';
-import CloudDownload from '@mui/icons-material/CloudDownload';
-import CloudUpload from '@mui/icons-material/CloudUpload';
+import SaveAlt from '@mui/icons-material/SaveAlt';
+import FolderOpenOutlined from '@mui/icons-material/FolderOpenOutlined';
 import type { WorkspaceMeta, WorkspaceData } from '../utils/workspaceStorage';
 import {
   getWorkspaceList,
@@ -33,13 +34,23 @@ import {
   getDefaultWorkspaceData,
   saveWorkspaceData,
 } from '../utils/workspaceStorage';
-import { downloadBackup, restoreFromBackup, isBackupData, type BackupData } from '../utils/backup';
+import {
+  saveWorkspaceWithPicker,
+  openWorkspaceWithPicker,
+  readWorkspaceFile,
+  hasOpenFilePicker,
+  hasSaveFilePicker,
+  type WorkspaceFileHandle,
+} from '../utils/workspaceFile';
 
 interface WorkspaceSwitcherProps {
   workspaceList: WorkspaceMeta[];
   currentWorkspaceId: string;
   currentWorkspaceData: WorkspaceData;
   currentWorkspaceLogo?: string;
+  autoSaveToFile: boolean;
+  onAutoSaveToFileChange: (v: boolean) => void;
+  fileHandleRef: React.MutableRefObject<WorkspaceFileHandle | null>;
   onSaveCurrent: (overrides?: Partial<WorkspaceData>) => void;
   onLoadWorkspace: (data: WorkspaceData) => void;
   onSetCurrentWorkspace: (id: string) => void;
@@ -59,7 +70,11 @@ function readFileAsDataUrl(file: File): Promise<string> {
 export default function WorkspaceSwitcher({
   workspaceList,
   currentWorkspaceId,
+  currentWorkspaceData,
   currentWorkspaceLogo,
+  autoSaveToFile,
+  onAutoSaveToFileChange,
+  fileHandleRef,
   onSaveCurrent,
   onLoadWorkspace,
   onSetCurrentWorkspace,
@@ -74,12 +89,11 @@ export default function WorkspaceSwitcher({
   const [editName, setEditName] = useState('');
   const [editLogo, setEditLogo] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [restoreError, setRestoreError] = useState<string | null>(null);
-  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
-  const pendingRestoreRef = useRef<BackupData | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const newLogoInputRef = useRef<HTMLInputElement>(null);
   const editLogoInputRef = useRef<HTMLInputElement>(null);
-  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const openFileInputRef = useRef<HTMLInputElement>(null);
 
   const currentMeta = workspaceList.find((w) => w.id === currentWorkspaceId);
   const currentName = currentMeta?.name ?? 'Workspace';
@@ -91,10 +105,7 @@ export default function WorkspaceSwitcher({
   const handleClose = () => setAnchorEl(null);
 
   const handleSwitch = (id: string) => {
-    if (id === currentWorkspaceId) {
-      handleClose();
-      return;
-    }
+    if (id === currentWorkspaceId) { handleClose(); return; }
     onSaveCurrent();
     setCurrentWorkspace(id);
     const list = getWorkspaceList();
@@ -107,10 +118,7 @@ export default function WorkspaceSwitcher({
   };
 
   const handleNewWorkspaceClick = () => {
-    setNewName('');
-    setNewLogo(null);
-    setNewOpen(true);
-    handleClose();
+    setNewName(''); setNewLogo(null); setNewOpen(true); handleClose();
   };
 
   const handleNewWorkspaceConfirm = () => {
@@ -125,16 +133,11 @@ export default function WorkspaceSwitcher({
     const defaultData = getDefaultWorkspaceData();
     onLoadWorkspace({ ...defaultData, logo });
     saveWorkspaceData(meta.id, { ...defaultData, logo });
-    setNewOpen(false);
-    setNewName('');
-    setNewLogo(null);
+    setNewOpen(false); setNewName(''); setNewLogo(null);
   };
 
   const handleEditOpen = () => {
-    setEditName(currentName);
-    setEditLogo(currentLogo ?? null);
-    setEditOpen(true);
-    handleClose();
+    setEditName(currentName); setEditLogo(currentLogo ?? null); setEditOpen(true); handleClose();
   };
 
   const handleEditConfirm = () => {
@@ -147,15 +150,10 @@ export default function WorkspaceSwitcher({
     onSaveCurrent({ logo });
     const list = getWorkspaceList();
     onSetWorkspaceList(list.workspaces);
-    setEditOpen(false);
-    setEditName('');
-    setEditLogo(null);
+    setEditOpen(false); setEditName(''); setEditLogo(null);
   };
 
-  const handleDeleteOpen = () => {
-    setDeleteOpen(true);
-    handleClose();
-  };
+  const handleDeleteOpen = () => { setDeleteOpen(true); handleClose(); };
 
   const handleDeleteConfirm = () => {
     if (!currentWorkspaceId) return;
@@ -170,47 +168,46 @@ export default function WorkspaceSwitcher({
     setDeleteOpen(false);
   };
 
-  const handleBackup = () => {
-    onSaveCurrent();
-    downloadBackup();
+  // ---- Save Workspace ----
+
+  const handleSaveWorkspace = async () => {
     handleClose();
+    setSaving(true);
+    try {
+      onSaveCurrent();
+      const handle = await saveWorkspaceWithPicker(currentName, currentWorkspaceData);
+      if (handle) fileHandleRef.current = handle;
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleRestoreClick = () => {
-    setRestoreError(null);
-    restoreInputRef.current?.click();
+  // ---- Open Workspace ----
+
+  const handleOpenWorkspace = async () => {
     handleClose();
+    if (hasOpenFilePicker()) {
+      const wsFile = await openWorkspaceWithPicker();
+      if (wsFile) {
+        onLoadWorkspace(wsFile.data);
+        onSaveCurrent(wsFile.data);
+      }
+    } else {
+      openFileInputRef.current?.click();
+    }
   };
 
-  const handleRestoreFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleOpenFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    try {
-      const text = await file.text();
-      const parsed = JSON.parse(text) as BackupData;
-      if (!isBackupData(parsed)) {
-        setRestoreError('Invalid backup file format.');
-        return;
-      }
-      pendingRestoreRef.current = parsed;
-      setRestoreConfirmOpen(true);
-    } catch {
-      setRestoreError('Invalid backup file. Please select a valid JSON backup.');
+    const wsFile = await readWorkspaceFile(file);
+    if (!wsFile) {
+      setOpenError('Invalid workspace file. Please select a valid .idcard file.');
+      return;
     }
-  };
-
-  const handleRestoreConfirm = () => {
-    const backup = pendingRestoreRef.current;
-    if (!backup) return;
-    const result = restoreFromBackup(backup);
-    if (result.ok) {
-      window.location.reload();
-    } else {
-      setRestoreError(result.error);
-    }
-    setRestoreConfirmOpen(false);
-    pendingRestoreRef.current = null;
+    onLoadWorkspace(wsFile.data);
+    onSaveCurrent(wsFile.data);
   };
 
   return (
@@ -231,9 +228,11 @@ export default function WorkspaceSwitcher({
           aria-expanded={Boolean(anchorEl)}
           aria-haspopup="true"
           sx={{ textTransform: 'none' }}
+          disabled={saving}
         >
           {currentName}
         </Button>
+
         <Menu
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
@@ -241,229 +240,214 @@ export default function WorkspaceSwitcher({
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-        {workspaceList.map((w) => (
-          <MenuItem
-            key={w.id}
-            selected={w.id === currentWorkspaceId}
-            onClick={() => handleSwitch(w.id)}
-          >
-            {w.logo ? (
-              <Avatar src={w.logo} sx={{ width: 24, height: 24, mr: 1.5 }} variant="rounded" />
-            ) : (
-              <ListItemIcon sx={{ minWidth: 40 }}>
-                <FolderOpen fontSize="small" />
-              </ListItemIcon>
-            )}
-            <ListItemText primary={w.name} />
+          {workspaceList.map((w) => (
+            <MenuItem key={w.id} selected={w.id === currentWorkspaceId} onClick={() => handleSwitch(w.id)}>
+              {w.logo ? (
+                <Avatar src={w.logo} sx={{ width: 24, height: 24, mr: 1.5 }} variant="rounded" />
+              ) : (
+                <ListItemIcon sx={{ minWidth: 40 }}><FolderOpen fontSize="small" /></ListItemIcon>
+              )}
+              <ListItemText primary={w.name} />
+            </MenuItem>
+          ))}
+
+          <Divider />
+
+          <MenuItem onClick={handleNewWorkspaceClick}>
+            <ListItemIcon><Add fontSize="small" /></ListItemIcon>
+            <ListItemText primary="New workspace" />
           </MenuItem>
-        ))}
-        <Divider />
-        <MenuItem onClick={handleNewWorkspaceClick}>
-          <ListItemIcon>
-            <Add fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="New workspace" />
-        </MenuItem>
-        <MenuItem onClick={handleEditOpen}>
-          <ListItemIcon>
-            <Edit fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="Edit workspace" />
-        </MenuItem>
-        <MenuItem
-          onClick={handleDeleteOpen}
-          disabled={workspaceList.length <= 1}
-          sx={{ color: 'error.main' }}
-        >
-          <ListItemIcon sx={{ color: 'inherit' }}>
-            <Delete fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="Delete current" />
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleBackup}>
-          <ListItemIcon>
-            <CloudDownload fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="Backup Data" />
-        </MenuItem>
-        <MenuItem onClick={handleRestoreClick}>
-          <ListItemIcon>
-            <CloudUpload fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="Restore From Backup" />
-        </MenuItem>
-      </Menu>
+          <MenuItem onClick={handleEditOpen}>
+            <ListItemIcon><Edit fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Edit workspace" />
+          </MenuItem>
+          <MenuItem
+            onClick={handleDeleteOpen}
+            disabled={workspaceList.length <= 1}
+            sx={{ color: 'error.main' }}
+          >
+            <ListItemIcon sx={{ color: 'inherit' }}><Delete fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Delete current" />
+          </MenuItem>
 
-      <input
-        ref={restoreInputRef}
-        type="file"
-        accept=".json,application/json"
-        style={{ display: 'none' }}
-        onChange={handleRestoreFileChange}
-      />
+          <Divider />
 
-      <Dialog open={restoreConfirmOpen} onClose={() => { setRestoreConfirmOpen(false); pendingRestoreRef.current = null; }}>
-        <DialogTitle>Restore Backup?</DialogTitle>
-        <DialogContent>
-          <Typography>
-            This will overwrite ALL workspaces and saved data with the backup. This cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setRestoreConfirmOpen(false); pendingRestoreRef.current = null; }}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleRestoreConfirm}>
-            Restore
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={Boolean(restoreError)} onClose={() => setRestoreError(null)}>
-        <DialogTitle>Restore Failed</DialogTitle>
-        <DialogContent>
-          <Typography color="error">{restoreError}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRestoreError(null)}>OK</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={newOpen} onClose={() => setNewOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>New Workspace</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleNewWorkspaceConfirm()}
-            placeholder="e.g. Conference badges"
-            sx={{ mt: 1, mb: 2 }}
-          />
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Logo (optional)
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <input
-              ref={newLogoInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (!file) return;
-                if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
-                if (file.size > 1 * 1024 * 1024) { alert('Logo must be under 1 MB.'); return; }
-                setNewLogo(await readFileAsDataUrl(file));
-              }}
+          <MenuItem onClick={handleSaveWorkspace}>
+            <ListItemIcon><SaveAlt fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="Save Workspace"
+              secondary={
+                !hasSaveFilePicker()
+                  ? 'Downloads as .idcard file'
+                  : fileHandleRef.current
+                  ? 'Overwrite saved file'
+                  : 'Choose save location'
+              }
             />
-            {newLogo ? (
-              <>
-                <Avatar src={newLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
-                <Button size="small" onClick={() => newLogoInputRef.current?.click()}>
-                  Change
-                </Button>
-                <Button size="small" color="secondary" onClick={() => setNewLogo(null)}>
-                  Remove
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<Image />}
-                onClick={() => newLogoInputRef.current?.click()}
-              >
-                Choose Image
-              </Button>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setNewOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleNewWorkspaceConfirm} disabled={!newName.trim()}>
-            Create
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </MenuItem>
 
-      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit Workspace</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Name"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleEditConfirm()}
-            sx={{ mt: 1, mb: 2 }}
-          />
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Logo
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <input
-              ref={editLogoInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (!file) return;
-                if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
-                if (file.size > 1 * 1024 * 1024) { alert('Logo must be under 1 MB.'); return; }
-                setEditLogo(await readFileAsDataUrl(file));
-              }}
+          <MenuItem onClick={handleOpenWorkspace}>
+            <ListItemIcon><FolderOpenOutlined fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Open Workspace" secondary="Load a saved .idcard file" />
+          </MenuItem>
+
+          {/* Autosave toggle — only meaningful when File System Access API is available */}
+          {hasSaveFilePicker() && (
+            <MenuItem
+              onClick={() => onAutoSaveToFileChange(!autoSaveToFile)}
+              dense
+              sx={{ pl: 1 }}
+            >
+              <Switch
+                size="small"
+                checked={autoSaveToFile}
+                onChange={(e) => { e.stopPropagation(); onAutoSaveToFileChange(e.target.checked); }}
+                sx={{ mr: 1 }}
+              />
+              <ListItemText
+                primary="Autosave"
+                secondary={
+                  fileHandleRef.current
+                    ? 'Saves to file on every change'
+                    : 'Save workspace first to enable'
+                }
+              />
+            </MenuItem>
+          )}
+        </Menu>
+
+        {/* Hidden file input for open (fallback when showOpenFilePicker unavailable) */}
+        <input
+          ref={openFileInputRef}
+          type="file"
+          accept=".idcard,.json,application/json"
+          style={{ display: 'none' }}
+          onChange={handleOpenFileChange}
+        />
+
+        {/* Open error dialog */}
+        <Dialog open={Boolean(openError)} onClose={() => setOpenError(null)}>
+          <DialogTitle>Could Not Open Workspace</DialogTitle>
+          <DialogContent>
+            <Typography color="error">{openError}</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenError(null)}>OK</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* New workspace dialog */}
+        <Dialog open={newOpen} onClose={() => setNewOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>New Workspace</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              fullWidth
+              label="Name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleNewWorkspaceConfirm()}
+              placeholder="e.g. Conference badges"
+              sx={{ mt: 1, mb: 2 }}
             />
-            {editLogo ? (
-              <>
-                <Avatar src={editLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
-                <Button size="small" onClick={() => editLogoInputRef.current?.click()}>
-                  Change
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Logo (optional)
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <input
+                ref={newLogoInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!file) return;
+                  if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+                  if (file.size > 1 * 1024 * 1024) { alert('Logo must be under 1 MB.'); return; }
+                  setNewLogo(await readFileAsDataUrl(file));
+                }}
+              />
+              {newLogo ? (
+                <>
+                  <Avatar src={newLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
+                  <Button size="small" onClick={() => newLogoInputRef.current?.click()}>Change</Button>
+                  <Button size="small" color="secondary" onClick={() => setNewLogo(null)}>Remove</Button>
+                </>
+              ) : (
+                <Button size="small" variant="outlined" startIcon={<Image />} onClick={() => newLogoInputRef.current?.click()}>
+                  Choose Image
                 </Button>
-                <Button size="small" color="secondary" onClick={() => setEditLogo(null)}>
-                  Remove
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<Image />}
-                onClick={() => editLogoInputRef.current?.click()}
-              >
-                Choose Image
-              </Button>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleEditConfirm}>
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setNewOpen(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handleNewWorkspaceConfirm} disabled={!newName.trim()}>Create</Button>
+          </DialogActions>
+        </Dialog>
 
-      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)}>
-        <DialogTitle>Delete Workspace?</DialogTitle>
-        <DialogContent>
-          <Typography>
-            This will permanently delete &quot;{currentName}&quot; and its saved data. You cannot
-            undo this.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleDeleteConfirm}>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {/* Edit workspace dialog */}
+        <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Edit Workspace</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              fullWidth
+              label="Name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleEditConfirm()}
+              sx={{ mt: 1, mb: 2 }}
+            />
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>Logo</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <input
+                ref={editLogoInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!file) return;
+                  if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+                  if (file.size > 1 * 1024 * 1024) { alert('Logo must be under 1 MB.'); return; }
+                  setEditLogo(await readFileAsDataUrl(file));
+                }}
+              />
+              {editLogo ? (
+                <>
+                  <Avatar src={editLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
+                  <Button size="small" onClick={() => editLogoInputRef.current?.click()}>Change</Button>
+                  <Button size="small" color="secondary" onClick={() => setEditLogo(null)}>Remove</Button>
+                </>
+              ) : (
+                <Button size="small" variant="outlined" startIcon={<Image />} onClick={() => editLogoInputRef.current?.click()}>
+                  Choose Image
+                </Button>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handleEditConfirm}>Save</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete confirmation */}
+        <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)}>
+          <DialogTitle>Delete Workspace?</DialogTitle>
+          <DialogContent>
+            <Typography>
+              This will permanently delete &quot;{currentName}&quot; and its saved data. You cannot undo this.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="contained" color="error" onClick={handleDeleteConfirm}>Delete</Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </ClickAwayListener>
   );
