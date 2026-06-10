@@ -164,6 +164,10 @@ export default function ElementPropertiesPanel({
               {...params}
               label="CSV Binding"
               placeholder="Select or type your own field name"
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                onUpdate({ binding: v || undefined });
+              }}
             />
           )}
           sx={{ mb: 1 }}
@@ -229,6 +233,10 @@ export default function ElementPropertiesPanel({
                   type: 'text',
                   inputMode: 'decimal',
                 }}
+                onBlur={(e) => {
+                  const { dynamic, size } = parseFontSizeValue(e.target.value);
+                  onUpdate({ fontSizeAuto: dynamic, fontSize: size } as Partial<TemplateElement>);
+                }}
               />
             )}
             sx={{ mb: 1 }}
@@ -258,6 +266,10 @@ export default function ElementPropertiesPanel({
                 {...params}
                 label="Font"
                 placeholder="Choose or type a font name"
+                onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  onUpdate({ fontFamily: v || undefined });
+                }}
               />
             )}
             sx={{ mb: 1 }}
