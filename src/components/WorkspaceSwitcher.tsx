@@ -181,7 +181,6 @@ export default function WorkspaceSwitcher({
     setNewSubParentId(parentId);
     setNewSubName('');
     setNewSubLogo(null);
-    setNewSubCopyTemplate(true);
     setNewSubOpen(true);
     handleClose();
   };
