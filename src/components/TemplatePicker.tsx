@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -10,9 +10,16 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import Divider from '@mui/material/Divider';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FileOpenIcon from '@mui/icons-material/FileOpen';
 import { BUILT_IN_TEMPLATES } from '../constants/templates';
-import { loadUserTemplates, deleteUserTemplate } from '../utils/userTemplates';
+import { loadUserTemplates, deleteUserTemplate, saveUserTemplate } from '../utils/userTemplates';
+import {
+  openTemplateWithPicker,
+  readTemplateFile,
+  hasOpenFilePicker,
+} from '../utils/workspaceFile';
 import type { Template, UserTemplateMeta } from '../types';
 
 interface TemplatePickerProps {
@@ -25,6 +32,13 @@ interface TemplatePickerProps {
 export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete }: TemplatePickerProps) {
   const [userTemplates, setUserTemplates] = useState(() => loadUserTemplates());
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  // Refresh template list every time the dialog opens
+  useEffect(() => {
+    if (open) setUserTemplates(loadUserTemplates());
+  }, [open]);
 
   const handleSelectBuiltIn = (t: Template) => {
     onSelect(t, { type: 'built-in', id: t.id });
@@ -49,13 +63,45 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
     setDeleteConfirm(null);
   };
 
+  const importAndSelect = (t: Template) => {
+    // Save to localStorage so it persists in "My templates"
+    saveUserTemplate(t);
+    setUserTemplates(loadUserTemplates());
+    onSelect(t, { type: 'user', id: t.id });
+    onClose();
+  };
+
+  const handleImportFromFile = async () => {
+    if (hasOpenFilePicker()) {
+      const file = await openTemplateWithPicker();
+      if (file) {
+        importAndSelect(file.template);
+      }
+    } else {
+      importInputRef.current?.click();
+    }
+  };
+
+  const handleImportInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const tf = await readTemplateFile(file);
+    if (!tf) {
+      setImportError('Invalid template file. Please choose a .idtemplate file.');
+      return;
+    }
+    importAndSelect(tf.template);
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Start From Template</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Saved templates are available in all workspaces.
+          Templates are available in all workspaces.
         </Typography>
+
         <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
           Built-in templates
         </Typography>
@@ -66,9 +112,11 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
             </ListItemButton>
           ))}
         </List>
+
         {userTemplates.length > 0 && (
           <>
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2, mb: 0.5 }}>
+            <Divider sx={{ my: 1 }} />
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
               My templates
             </Typography>
             <List dense>
@@ -89,7 +137,10 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
                   }
                 >
                   <ListItemButton onClick={() => handleSelectUser(meta, template)}>
-                    <ListItemText primary={meta.name} secondary={new Date(meta.savedAt).toLocaleDateString()} />
+                    <ListItemText
+                      primary={meta.name}
+                      secondary={new Date(meta.savedAt).toLocaleDateString()}
+                    />
                   </ListItemButton>
                 </ListItem>
               ))}
@@ -97,10 +148,29 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
           </>
         )}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+
+      <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
+        <Button
+          startIcon={<FileOpenIcon />}
+          onClick={handleImportFromFile}
+          variant="outlined"
+          size="small"
+        >
+          Import from file
+        </Button>
+        <Button onClick={onClose}>Close</Button>
       </DialogActions>
 
+      {/* Hidden fallback file input for browsers without FSA */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".idtemplate,.json,application/json"
+        style={{ display: 'none' }}
+        onChange={handleImportInputChange}
+      />
+
+      {/* Delete confirmation */}
       <Dialog open={deleteConfirm !== null} onClose={() => setDeleteConfirm(null)}>
         <DialogTitle>Delete Template</DialogTitle>
         <DialogContent>
@@ -113,6 +183,17 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
           <Button color="error" variant="contained" onClick={handleDeleteConfirm}>
             Delete
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Import error */}
+      <Dialog open={Boolean(importError)} onClose={() => setImportError(null)}>
+        <DialogTitle>Import Failed</DialogTitle>
+        <DialogContent>
+          <Typography color="error">{importError}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImportError(null)}>OK</Button>
         </DialogActions>
       </Dialog>
     </Dialog>

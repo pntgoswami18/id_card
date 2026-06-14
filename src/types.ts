@@ -124,6 +124,11 @@ export interface PrintSettings {
   paperHeightMm?: number;
   /** Page margin in mm (applied on all four sides). Defaults to 5. */
   pageMarginMm?: number;
+  /**
+   * Paper sheet orientation. 'auto' picks whichever fits more cards per page.
+   * Card design dimensions are unaffected.
+   */
+  paperOrientation?: 'portrait' | 'landscape' | 'auto';
 }
 
 // User-saved template (stored in localStorage)

@@ -1,9 +1,7 @@
 import React, { useState, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -95,7 +93,7 @@ export default function WorkspaceSwitcher({
   const [newSubOpen, setNewSubOpen] = useState(false);
   const [newSubName, setNewSubName] = useState('');
   const [newSubLogo, setNewSubLogo] = useState<string | null>(null);
-  const [newSubCopyTemplate, setNewSubCopyTemplate] = useState(true);
+  // Sub-workspaces always inherit the parent's template and print settings
   const [newSubParentId, setNewSubParentId] = useState<string | null>(null);
   // edit / delete
   const [editOpen, setEditOpen] = useState(false);
@@ -198,16 +196,14 @@ export default function WorkspaceSwitcher({
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(meta.id);
     let initialData = getDefaultWorkspaceData();
-    if (newSubCopyTemplate) {
-      const parentData = getWorkspaceData(newSubParentId);
-      if (parentData) {
-        initialData = {
-          ...initialData,
-          template: parentData.template,
-          currentTemplateSource: parentData.currentTemplateSource,
-          printSettings: parentData.printSettings,
-        };
-      }
+    const parentData = getWorkspaceData(newSubParentId);
+    if (parentData) {
+      initialData = {
+        ...initialData,
+        template: parentData.template,
+        currentTemplateSource: parentData.currentTemplateSource,
+        printSettings: parentData.printSettings,
+      };
     }
     onLoadWorkspace({ ...initialData, logo });
     saveWorkspaceData(meta.id, { ...initialData, logo });
@@ -540,21 +536,10 @@ export default function WorkspaceSwitcher({
               placeholder="e.g. VIP Guests"
               sx={{ mt: 1, mb: 1.5 }}
             />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  checked={newSubCopyTemplate}
-                  onChange={(e) => setNewSubCopyTemplate(e.target.checked)}
-                />
-              }
-              label={
-                <Typography variant="body2">
-                  Copy card template &amp; print settings from parent
-                </Typography>
-              }
-              sx={{ mb: 2 }}
-            />
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              The card template and print settings will be inherited from the parent workspace.
+              You can update them later in the Design step.
+            </Typography>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Logo (optional)
             </Typography>

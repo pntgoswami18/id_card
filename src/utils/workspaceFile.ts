@@ -1,3 +1,4 @@
+import type { Template } from '../types';
 import type { WorkspaceData } from './workspaceStorage';
 
 // ---- File System Access API types (not in standard lib.dom) ----
@@ -158,6 +159,110 @@ export async function readWorkspaceFile(file: File): Promise<WorkspaceFile | nul
     const text = await file.text();
     const parsed: unknown = JSON.parse(text);
     return isWorkspaceFile(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---- Template file format ----
+
+export interface TemplateFile {
+  version: 1;
+  app: 'id_card_generator';
+  type: 'template';
+  savedAt: string;
+  name: string;
+  template: Template;
+}
+
+export function isTemplateFile(obj: unknown): obj is TemplateFile {
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return (
+    o.version === 1 &&
+    o.app === 'id_card_generator' &&
+    o.type === 'template' &&
+    typeof o.name === 'string' &&
+    !!o.template &&
+    typeof o.template === 'object'
+  );
+}
+
+function buildTemplateContent(name: string, template: Template): string {
+  const file: TemplateFile = {
+    version: 1,
+    app: 'id_card_generator',
+    type: 'template',
+    savedAt: new Date().toISOString(),
+    name,
+    template,
+  };
+  return JSON.stringify(file, null, 2);
+}
+
+/**
+ * Open the OS save-file picker and save a template.
+ * Falls back to a direct download when FSA is unavailable.
+ * Returns true if saved successfully (via FSA or download).
+ */
+export async function saveTemplateWithPicker(name: string, template: Template): Promise<boolean> {
+  const w = window as WindowWithFSA;
+  const content = buildTemplateContent(name, template);
+  if (!w.showSaveFilePicker) {
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName(name)}.idtemplate`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return true;
+  }
+  try {
+    const handle = await w.showSaveFilePicker({
+      suggestedName: `${safeName(name)}.idtemplate`,
+      types: [{ description: 'ID Card Template', accept: { 'application/json': ['.idtemplate'] } }],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    return true;
+  } catch (err) {
+    if ((err as DOMException).name !== 'AbortError') console.error('Save template failed:', err);
+    return false;
+  }
+}
+
+/**
+ * Open the OS file picker and read a template file.
+ * Returns null if cancelled, not supported, or invalid format.
+ */
+export async function openTemplateWithPicker(): Promise<TemplateFile | null> {
+  const w = window as WindowWithFSA;
+  if (!w.showOpenFilePicker) return null;
+  try {
+    const [handle] = await w.showOpenFilePicker({
+      types: [
+        {
+          description: 'ID Card Template',
+          accept: { 'application/json': ['.idtemplate', '.json'] },
+        },
+      ],
+    });
+    const file = await handle.getFile();
+    return readTemplateFile(file);
+  } catch (err) {
+    if ((err as DOMException).name !== 'AbortError') console.error('Open template failed:', err);
+    return null;
+  }
+}
+
+/** Parse a File into a TemplateFile. Returns null if invalid. */
+export async function readTemplateFile(file: File): Promise<TemplateFile | null> {
+  try {
+    const text = await file.text();
+    const parsed: unknown = JSON.parse(text);
+    return isTemplateFile(parsed) ? parsed : null;
   } catch {
     return null;
   }

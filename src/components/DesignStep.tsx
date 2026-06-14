@@ -24,6 +24,7 @@ import TemplatePicker from './TemplatePicker';
 import BackgroundWatermarkPanel from './BackgroundWatermarkPanel';
 import { ElementPropertiesPanel } from './DesignEditor';
 import { saveUserTemplate } from '../utils/userTemplates';
+import { saveTemplateWithPicker, hasSaveFilePicker } from '../utils/workspaceFile';
 import type { Template, TemplateElement } from '../types';
 import { generateId } from '../utils/id';
 
@@ -203,20 +204,24 @@ export default function DesignStep() {
 
   const canSaveOverwrite = currentTemplateSource?.type === 'user';
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canSaveOverwrite) return;
     const toSave: Template = { ...template, id: template.id, name: template.name };
     saveUserTemplate(toSave);
+    await saveTemplateWithPicker(toSave.name, toSave);
   };
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = async () => {
     const name = saveTemplateName.trim() || 'My Template';
     const id = `user-${Date.now()}`;
     const toSave: Template = { ...template, id, name };
+    // Always save to localStorage so it appears in TemplatePicker
     saveUserTemplate(toSave);
     dispatch({ type: 'SET_CURRENT_TEMPLATE_SOURCE', payload: { type: 'user', id } });
     setSaveDialogOpen(false);
     setSaveTemplateName('');
+    // Also save to a file if FSA is available (or fall back to download)
+    await saveTemplateWithPicker(name, toSave);
   };
 
   const wMm = printSettings.orientation === 'portrait' ? printSettings.heightMm : printSettings.widthMm;
@@ -453,8 +458,14 @@ export default function DesignStep() {
             label="Template Name"
             value={saveTemplateName}
             onChange={(e) => setSaveTemplateName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTemplate(); }}
             sx={{ mt: 1 }}
           />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            {hasSaveFilePicker()
+              ? 'Saves to your templates list and opens a file browser to export a .idtemplate file.'
+              : 'Saves to your templates list and downloads a .idtemplate file.'}
+          </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>

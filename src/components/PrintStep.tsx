@@ -3,44 +3,46 @@ import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { useAppState, useAppDispatch } from '../store/AppStateContext';
-import PrintSettings, { computeLayout } from './PrintSettings';
+import PrintSettings, { computeLayout, computeEffectivePaperDims } from './PrintSettings';
 import PrintView from './PrintView';
 
 export default function PrintStep() {
   const { template, records, printSettings, printPresets, selectedCardIndices } = useAppState();
   const dispatch = useAppDispatch();
 
-  // Oriented card dimensions
-  const cardW = printSettings.orientation === 'portrait' ? printSettings.widthMm : printSettings.heightMm;
-  const cardH = printSettings.orientation === 'portrait' ? printSettings.heightMm : printSettings.widthMm;
-  const safeCardW = Number.isFinite(cardW) ? cardW : 85.6;
-  const safeCardH = Number.isFinite(cardH) ? cardH : 53.98;
+  // Card dimensions — same swap convention as DesignStep:
+  // portrait: heightMm becomes the card width (card is taller than wide)
+  // landscape: widthMm becomes the card width (card is wider than tall)
+  const cardW = printSettings.orientation === 'portrait'
+    ? printSettings.heightMm
+    : printSettings.widthMm;
+  const cardH = printSettings.orientation === 'portrait'
+    ? printSettings.widthMm
+    : printSettings.heightMm;
+  const safeCardW = Number.isFinite(cardW) ? cardW : 53.98;
+  const safeCardH = Number.isFinite(cardH) ? cardH : 85.6;
 
-  const paperW = printSettings.paperWidthMm ?? 210;
-  const paperH = printSettings.paperHeightMm ?? 297;
-  const margin = printSettings.pageMarginMm ?? 5;
+  const rawPaperW = printSettings.paperWidthMm  ?? 210;
+  const rawPaperH = printSettings.paperHeightMm ?? 297;
+  const margin    = printSettings.pageMarginMm  ?? 5;
+  const paperOrientation = printSettings.paperOrientation ?? 'auto';
+
+  const { w: paperW, h: paperH } = computeEffectivePaperDims(
+    rawPaperW, rawPaperH, paperOrientation, safeCardW, safeCardH, margin,
+  );
 
   const printIndices =
     selectedCardIndices.length > 0 ? selectedCardIndices : records.map((_, i) => i);
 
   const layout = computeLayout(paperW, paperH, safeCardW, safeCardH, margin);
-  const totalCards = printIndices.length;
+  const totalCards  = printIndices.length;
   const totalSheets = totalCards > 0 ? Math.ceil(totalCards / layout.perPage) : 0;
-
-  const handlePrint = () => {
-    window.print();
-  };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'auto' }}>
       <Box
         id="print-view"
-        sx={{
-          position: 'absolute',
-          left: -9999,
-          top: 0,
-          overflow: 'hidden',
-        }}
+        sx={{ position: 'absolute', left: -9999, top: 0, overflow: 'hidden' }}
       >
         <PrintView
           template={template}
@@ -59,20 +61,14 @@ export default function PrintStep() {
           .no-print, .no-print * { display: none !important; }
           body * { visibility: hidden; }
           #print-view, #print-view * { visibility: visible; }
-          #print-view {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-          }
+          #print-view { position: absolute !important; left: 0 !important; top: 0 !important; }
           @page { size: ${paperW}mm ${paperH}mm; margin: 0; }
           body { margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
 
       <Paper sx={{ p: 2, mb: 2 }} className="no-print">
-        <Typography variant="subtitle2" gutterBottom>
-          Print settings
-        </Typography>
+        <Typography variant="subtitle2" gutterBottom>Print settings</Typography>
         <PrintSettings
           settings={printSettings}
           presets={printPresets}
@@ -88,7 +84,7 @@ export default function PrintStep() {
         <Button
           variant="contained"
           disabled={records.length === 0}
-          onClick={handlePrint}
+          onClick={() => window.print()}
         >
           {selectedCardIndices.length > 0
             ? `Print Selected (${selectedCardIndices.length})`
@@ -96,7 +92,8 @@ export default function PrintStep() {
         </Button>
         {totalCards > 0 && (
           <Typography variant="body2" color="text.secondary">
-            {layout.perPage} card{layout.perPage !== 1 ? 's' : ''} per sheet · {totalSheets} sheet{totalSheets !== 1 ? 's' : ''} total
+            {layout.perPage} card{layout.perPage !== 1 ? 's' : ''} per sheet
+            {' · '}{totalSheets} sheet{totalSheets !== 1 ? 's' : ''} total
           </Typography>
         )}
       </Box>
