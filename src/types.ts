@@ -124,6 +124,8 @@ export interface PrintSettings {
   paperHeightMm?: number;
   /** Page margin in mm (applied on all four sides). Defaults to 5. */
   pageMarginMm?: number;
+  /** Gap between cards in mm. Defaults to 0. */
+  cardGapMm?: number;
   /**
    * Paper sheet orientation. 'auto' picks whichever fits more cards per page.
    * Card design dimensions are unaffected.

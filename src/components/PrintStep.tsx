@@ -25,16 +25,17 @@ export default function PrintStep() {
   const rawPaperW = printSettings.paperWidthMm  ?? 210;
   const rawPaperH = printSettings.paperHeightMm ?? 297;
   const margin    = printSettings.pageMarginMm  ?? 5;
+  const gap       = printSettings.cardGapMm     ?? 0;
   const paperOrientation = printSettings.paperOrientation ?? 'auto';
 
   const { w: paperW, h: paperH } = computeEffectivePaperDims(
-    rawPaperW, rawPaperH, paperOrientation, safeCardW, safeCardH, margin,
+    rawPaperW, rawPaperH, paperOrientation, safeCardW, safeCardH, margin, gap,
   );
 
   const printIndices =
     selectedCardIndices.length > 0 ? selectedCardIndices : records.map((_, i) => i);
 
-  const layout = computeLayout(paperW, paperH, safeCardW, safeCardH, margin);
+  const layout = computeLayout(paperW, paperH, safeCardW, safeCardH, margin, gap);
   const totalCards  = printIndices.length;
   const totalSheets = totalCards > 0 ? Math.ceil(totalCards / layout.perPage) : 0;
 
@@ -53,6 +54,7 @@ export default function PrintStep() {
           paperWidthMm={paperW}
           paperHeightMm={paperH}
           pageMarginMm={margin}
+          cardGapMm={gap}
         />
       </Box>
 

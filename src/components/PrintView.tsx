@@ -13,6 +13,7 @@ interface PrintViewProps {
   paperWidthMm: number;
   paperHeightMm: number;
   pageMarginMm: number;
+  cardGapMm?: number;
 }
 
 export default function PrintView({
@@ -24,6 +25,7 @@ export default function PrintView({
   paperWidthMm,
   paperHeightMm,
   pageMarginMm,
+  cardGapMm = 0,
 }: PrintViewProps) {
   const cardsToPrint = indices.filter((i) => records[i]).map((i) => records[i]);
 
@@ -33,6 +35,7 @@ export default function PrintView({
     cardWidthMm,
     cardHeightMm,
     pageMarginMm,
+    cardGapMm,
   );
 
   // Split into pages
@@ -55,6 +58,7 @@ export default function PrintView({
             display: 'grid',
             gridTemplateColumns: `repeat(${cols}, ${cardWidthMm}mm)`,
             gridTemplateRows: `repeat(${rows}, ${cardHeightMm}mm)`,
+            gap: `${cardGapMm}mm`,
             alignContent: 'start',
             justifyContent: 'start',
             breakAfter: 'page',

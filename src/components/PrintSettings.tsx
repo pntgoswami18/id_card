@@ -45,11 +45,13 @@ export function computeLayout(
   cardW: number,
   cardH: number,
   margin: number,
+  gap = 0,
 ): { cols: number; rows: number; perPage: number } {
   const usableW = paperW - 2 * margin;
   const usableH = paperH - 2 * margin;
-  const cols = Math.max(1, Math.floor(usableW / cardW));
-  const rows = Math.max(1, Math.floor(usableH / cardH));
+  // N cards + (N-1) gaps <= usable  →  N <= (usable + gap) / (card + gap)
+  const cols = Math.max(1, Math.floor((usableW + gap) / (cardW + gap)));
+  const rows = Math.max(1, Math.floor((usableH + gap) / (cardH + gap)));
   return { cols, rows, perPage: cols * rows };
 }
 
@@ -65,6 +67,7 @@ export function computeEffectivePaperDims(
   cardW: number,
   cardH: number,
   margin: number,
+  gap = 0,
 ): { w: number; h: number; usedOrientation: 'portrait' | 'landscape' } {
   const shortSide = Math.min(rawW, rawH);
   const longSide  = Math.max(rawW, rawH);
@@ -77,8 +80,8 @@ export function computeEffectivePaperDims(
   }
 
   // auto: pick the orientation that fits more cards per page; portrait wins ties
-  const portrait  = computeLayout(shortSide, longSide, cardW, cardH, margin);
-  const landscape = computeLayout(longSide, shortSide, cardW, cardH, margin);
+  const portrait  = computeLayout(shortSide, longSide, cardW, cardH, margin, gap);
+  const landscape = computeLayout(longSide, shortSide, cardW, cardH, margin, gap);
   if (landscape.perPage > portrait.perPage) {
     return { w: longSide, h: shortSide, usedOrientation: 'landscape' };
   }
@@ -102,6 +105,7 @@ export default function PrintSettingsComponent({
   const rawPaperW = settings.paperWidthMm  ?? 210;
   const rawPaperH = settings.paperHeightMm ?? 297;
   const margin    = settings.pageMarginMm  ?? 5;
+  const gap       = settings.cardGapMm     ?? 0;
   const paperOrientation = settings.paperOrientation ?? 'auto';
   const sizeId    = detectPaperSizeId(rawPaperW, rawPaperH);
 
@@ -146,9 +150,9 @@ export default function PrintSettingsComponent({
   let resolvedOrientation: 'portrait' | 'landscape' | null = null;
   if (hasCardDims) {
     const eff = computeEffectivePaperDims(
-      rawPaperW, rawPaperH, paperOrientation, cardWidthMm!, cardHeightMm!, margin,
+      rawPaperW, rawPaperH, paperOrientation, cardWidthMm!, cardHeightMm!, margin, gap,
     );
-    layoutSummary = computeLayout(eff.w, eff.h, cardWidthMm!, cardHeightMm!, margin);
+    layoutSummary = computeLayout(eff.w, eff.h, cardWidthMm!, cardHeightMm!, margin, gap);
     resolvedOrientation = eff.usedOrientation;
   }
 
@@ -211,16 +215,24 @@ export default function PrintSettingsComponent({
         )}
       </Box>
 
-      {/* ── Margin + layout summary ── */}
+      {/* ── Margins + layout summary ── */}
       <Box>
-        <TextField
-          size="small" label="Page margin (mm)" type="number"
-          value={margin}
-          onChange={(e) => onSettingsChange({ pageMarginMm: parseFloat(e.target.value) ?? 5 })}
-          inputProps={{ min: 0, max: 50, step: 0.5 }}
-          fullWidth
-          sx={{ mb: 0.5 }}
-        />
+        <Box sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
+          <TextField
+            size="small" label="Page margin (mm)" type="number"
+            value={margin}
+            onChange={(e) => onSettingsChange({ pageMarginMm: parseFloat(e.target.value) ?? 5 })}
+            inputProps={{ min: 0, max: 50, step: 0.5 }}
+            sx={{ flex: 1 }}
+          />
+          <TextField
+            size="small" label="Card gap (mm)" type="number"
+            value={gap}
+            onChange={(e) => onSettingsChange({ cardGapMm: parseFloat(e.target.value) ?? 0 })}
+            inputProps={{ min: 0, max: 50, step: 0.5 }}
+            sx={{ flex: 1 }}
+          />
+        </Box>
         {layoutSummary && (
           <Typography variant="caption" color="text.secondary">
             {layoutSummary.cols} × {layoutSummary.rows} = {layoutSummary.perPage} card
