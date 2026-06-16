@@ -51,7 +51,7 @@ const PrintStep = lazy(() => import('./components/PrintStep'));
 const steps = ['Design', 'Data', 'Preview', 'Print'];
 
 function AppContent() {
-  const { activeStep, currentWorkspaceId, workspaceList, currentWorkspaceLogo, template, records, columnMapping, printPresets, printSettings, selectedCardIndices, currentTemplateSource } = useAppState();
+  const { activeStep, currentWorkspaceId, workspaceList, currentWorkspaceLogo, template, records, columnMapping, printPresets, printSettings, selectedCardIndices, currentTemplateSource, csvData } = useAppState();
   const dispatch = useAppDispatch();
   const hydratedRef = useRef(false);
   const skipAutoSaveRef = useRef(true);
@@ -87,6 +87,7 @@ function AppContent() {
       selectedCardIndices,
       currentTemplateSource,
       logo: currentWorkspaceLogo,
+      csvData,
     };
     const t = setTimeout(() => {
       saveWorkspaceData(currentWorkspaceId, data);
@@ -106,6 +107,7 @@ function AppContent() {
     selectedCardIndices,
     currentTemplateSource,
     currentWorkspaceLogo,
+    csvData,
     autoSaveToFile,
   ]);
 
@@ -118,6 +120,7 @@ function AppContent() {
     selectedCardIndices,
     currentTemplateSource,
     logo: currentWorkspaceLogo,
+    csvData,
   };
 
   const stepContent = [

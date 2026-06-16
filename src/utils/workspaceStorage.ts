@@ -1,4 +1,5 @@
 import type { Template, CardRecord, ColumnMapping, PrintPreset, PrintSettings } from '../types';
+import type { ParsedCsv } from './csv';
 
 export const LIST_KEY = 'id_card_workspace_list';
 export const DATA_PREFIX = 'id_card_workspace_data_';
@@ -28,6 +29,8 @@ export interface WorkspaceData {
   currentTemplateSource: { type: 'built-in'; id: string } | { type: 'user'; id: string } | null;
   /** Data URL or image URL for workspace logo. */
   logo?: string;
+  /** Parsed CSV retained so the Data step can show column-mapping on reload. */
+  csvData?: ParsedCsv | null;
 }
 
 function safeParse<T>(raw: string | null, fallback: T): T {

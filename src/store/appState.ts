@@ -167,6 +167,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...(p.selectedCardIndices != null && { selectedCardIndices: p.selectedCardIndices }),
         ...(p.currentTemplateSource !== undefined && { currentTemplateSource: p.currentTemplateSource }),
         ...('logo' in p ? { currentWorkspaceLogo: p.logo } : {}),
+        // Restore csvData so the Data step shows column-mapping on reload (null when not saved yet)
+        csvData: 'csvData' in p ? (p.csvData ?? null) : null,
       };
     }
     case 'SET_CURRENT_WORKSPACE':
