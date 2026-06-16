@@ -36,6 +36,8 @@ import {
   getWorkspaceList,
   getWorkspaceData,
   createWorkspace,
+  createWorkspaceId,
+  saveWorkspaceList,
   createSubWorkspace,
   deleteWorkspaceTree,
   renameWorkspace,
@@ -335,7 +337,7 @@ export default function WorkspaceSwitcher({
   const handleDupSubOpen = () => {
     setDupSubName(`${currentMeta?.name ?? 'Sub-workspace'} (copy)`);
     setDupSubLocation('same');
-    setDupSubTargetParentId(rootWorkspaces[0]?.id ?? '');
+    setDupSubTargetParentId(otherRootWorkspaces[0]?.id ?? '');
     setDupSubNewParentName('');
     setDupSubOpen(true);
     handleClose();
@@ -349,15 +351,22 @@ export default function WorkspaceSwitcher({
 
     let targetParentId = currentMeta.parentId;
 
+    try {
     if (dupSubLocation === 'different') {
       if (!dupSubTargetParentId) return;
       targetParentId = dupSubTargetParentId;
     } else if (dupSubLocation === 'new') {
       const newParentName = dupSubNewParentName.trim();
       if (!newParentName) return;
-      const newParent = createWorkspace(newParentName);
-      saveWorkspaceData(newParent.id, getDefaultWorkspaceData());
-      targetParentId = newParent.id;
+      // Create the new root workspace without switching currentId yet —
+      // duplicateWorkspace will set currentId to the final duplicate in one go.
+      const newParentId = createWorkspaceId();
+      const newParentMeta: WorkspaceMeta = { id: newParentId, name: newParentName };
+      const list = getWorkspaceList();
+      list.workspaces = [...list.workspaces, newParentMeta];
+      saveWorkspaceList(list);
+      saveWorkspaceData(newParentId, getDefaultWorkspaceData());
+      targetParentId = newParentId;
     }
 
     const meta = duplicateWorkspace(currentWorkspaceId, name, targetParentId);
@@ -372,6 +381,10 @@ export default function WorkspaceSwitcher({
     setDupSubLocation('same');
     setDupSubTargetParentId('');
     setDupSubNewParentName('');
+    } catch (err) {
+      console.error('Duplicate sub-workspace failed:', err);
+      alert(`Could not duplicate: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
 
   // ---- Logo input handler (reused for new / sub / edit) ----
@@ -776,7 +789,7 @@ export default function WorkspaceSwitcher({
                     onChange={(e) => setDupSubTargetParentId(e.target.value)}
                     native={false}
                   >
-                    {rootWorkspaces.map((w) => (
+                    {otherRootWorkspaces.map((w) => (
                       <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
                     ))}
                   </Select>

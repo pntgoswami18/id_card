@@ -221,14 +221,14 @@ export default function PrintSettingsComponent({
           <TextField
             size="small" label="Page margin (mm)" type="number"
             value={margin}
-            onChange={(e) => onSettingsChange({ pageMarginMm: parseFloat(e.target.value) ?? 5 })}
+            onChange={(e) => onSettingsChange({ pageMarginMm: parseFloat(e.target.value) || 0 })}
             inputProps={{ min: 0, max: 50, step: 0.5 }}
             sx={{ flex: 1 }}
           />
           <TextField
             size="small" label="Card gap (mm)" type="number"
             value={gap}
-            onChange={(e) => onSettingsChange({ cardGapMm: parseFloat(e.target.value) ?? 0 })}
+            onChange={(e) => onSettingsChange({ cardGapMm: parseFloat(e.target.value) || 0 })}
             inputProps={{ min: 0, max: 50, step: 0.5 }}
             sx={{ flex: 1 }}
           />

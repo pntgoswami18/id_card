@@ -214,7 +214,9 @@ export function duplicateWorkspace(
   newName: string,
   parentId?: string,
 ): WorkspaceMeta {
-  const sourceData = getWorkspaceData(sourceId) ?? getDefaultWorkspaceData();
+  const raw = getWorkspaceData(sourceId) ?? getDefaultWorkspaceData();
+  // Strip csvData from the copy — it can be large and is trivial to re-upload.
+  const { csvData: _csv, ...sourceData } = raw;
   const newId = createWorkspaceId();
   const meta: WorkspaceMeta = {
     id: newId,

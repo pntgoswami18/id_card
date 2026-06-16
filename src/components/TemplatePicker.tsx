@@ -64,10 +64,11 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
   };
 
   const importAndSelect = (t: Template) => {
-    // Save to localStorage so it persists in "My templates"
-    saveUserTemplate(t);
+    // Assign a fresh id so the import never silently overwrites an existing user template
+    const imported: Template = { ...t, id: `user-${Date.now()}` };
+    saveUserTemplate(imported);
     setUserTemplates(loadUserTemplates());
-    onSelect(t, { type: 'user', id: t.id });
+    onSelect(imported, { type: 'user', id: imported.id });
     onClose();
   };
 

@@ -217,6 +217,8 @@ export default function DesignStep() {
     const toSave: Template = { ...template, id, name };
     // Always save to localStorage so it appears in TemplatePicker
     saveUserTemplate(toSave);
+    // Update both template id and source so subsequent "Save" overwrites the right key
+    dispatch({ type: 'SET_TEMPLATE', payload: toSave });
     dispatch({ type: 'SET_CURRENT_TEMPLATE_SOURCE', payload: { type: 'user', id } });
     setSaveDialogOpen(false);
     setSaveTemplateName('');
