@@ -204,6 +204,32 @@ export function deleteWorkspaceTree(id: string): void {
   toDelete.forEach((delId) => localStorage.removeItem(DATA_PREFIX + delId));
 }
 
+/**
+ * Creates a full copy of a workspace (data + list entry) under a new ID.
+ * Switches currentId to the new workspace.
+ * parentId → creates as a sub-workspace; omit → creates as a root workspace.
+ */
+export function duplicateWorkspace(
+  sourceId: string,
+  newName: string,
+  parentId?: string,
+): WorkspaceMeta {
+  const sourceData = getWorkspaceData(sourceId) ?? getDefaultWorkspaceData();
+  const newId = createWorkspaceId();
+  const meta: WorkspaceMeta = {
+    id: newId,
+    name: newName,
+    ...(parentId ? { parentId } : {}),
+    ...(sourceData.logo ? { logo: sourceData.logo } : {}),
+  };
+  const list = getWorkspaceList();
+  list.workspaces = [...list.workspaces, meta];
+  list.currentId = newId;
+  saveWorkspaceList(list);
+  saveWorkspaceData(newId, sourceData);
+  return meta;
+}
+
 /** Default data for a new workspace. */
 export function getDefaultWorkspaceData(): WorkspaceData {
   return {

@@ -159,6 +159,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       const p = action.payload;
       return {
         ...state,
+        activeStep: 0, // always land on Design when switching workspaces
         ...(p.template != null && { template: p.template }),
         ...(p.records != null && { records: p.records }),
         ...(p.columnMapping != null && { columnMapping: p.columnMapping }),

@@ -15,10 +15,17 @@ import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Switch from '@mui/material/Switch';
 import Avatar from '@mui/material/Avatar';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
+import FormControl from '@mui/material/FormControl';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
 import FolderOpen from '@mui/icons-material/FolderOpen';
 import Add from '@mui/icons-material/Add';
 import Edit from '@mui/icons-material/Edit';
 import Delete from '@mui/icons-material/Delete';
+import ContentCopy from '@mui/icons-material/ContentCopy';
 import Image from '@mui/icons-material/Image';
 import SaveAlt from '@mui/icons-material/SaveAlt';
 import FolderOpenOutlined from '@mui/icons-material/FolderOpenOutlined';
@@ -36,6 +43,7 @@ import {
   setCurrentWorkspace,
   getDefaultWorkspaceData,
   saveWorkspaceData,
+  duplicateWorkspace,
 } from '../utils/workspaceStorage';
 import {
   saveWorkspaceWithPicker,
@@ -100,6 +108,15 @@ export default function WorkspaceSwitcher({
   const [editName, setEditName] = useState('');
   const [editLogo, setEditLogo] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // duplicate root workspace
+  const [dupRootOpen, setDupRootOpen] = useState(false);
+  const [dupRootName, setDupRootName] = useState('');
+  // duplicate sub-workspace
+  const [dupSubOpen, setDupSubOpen] = useState(false);
+  const [dupSubName, setDupSubName] = useState('');
+  const [dupSubLocation, setDupSubLocation] = useState<'same' | 'different' | 'new'>('same');
+  const [dupSubTargetParentId, setDupSubTargetParentId] = useState('');
+  const [dupSubNewParentName, setDupSubNewParentName] = useState('');
   // misc
   const [openError, setOpenError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -291,6 +308,72 @@ export default function WorkspaceSwitcher({
     onSaveCurrent(wsFile.data);
   };
 
+  // ---- Duplicate root workspace ----
+  const handleDupRootOpen = () => {
+    setDupRootName(`${currentMeta?.name ?? 'Workspace'} (copy)`);
+    setDupRootOpen(true);
+    handleClose();
+  };
+
+  const handleDupRootConfirm = () => {
+    const name = dupRootName.trim();
+    if (!name) return;
+    onSaveCurrent();
+    const meta = duplicateWorkspace(currentWorkspaceId, name);
+    const list = getWorkspaceList();
+    onSetWorkspaceList(list.workspaces);
+    onSetCurrentWorkspace(meta.id);
+    const data = getWorkspaceData(meta.id);
+    onLoadWorkspace({ ...(data ?? getDefaultWorkspaceData()), logo: data?.logo });
+    setDupRootOpen(false);
+    setDupRootName('');
+  };
+
+  // ---- Duplicate sub-workspace ----
+  const otherRootWorkspaces = rootWorkspaces.filter((w) => w.id !== currentMeta?.parentId);
+
+  const handleDupSubOpen = () => {
+    setDupSubName(`${currentMeta?.name ?? 'Sub-workspace'} (copy)`);
+    setDupSubLocation('same');
+    setDupSubTargetParentId(rootWorkspaces[0]?.id ?? '');
+    setDupSubNewParentName('');
+    setDupSubOpen(true);
+    handleClose();
+  };
+
+  const handleDupSubConfirm = () => {
+    const name = dupSubName.trim();
+    if (!name || !currentMeta?.parentId) return;
+
+    onSaveCurrent();
+
+    let targetParentId = currentMeta.parentId;
+
+    if (dupSubLocation === 'different') {
+      if (!dupSubTargetParentId) return;
+      targetParentId = dupSubTargetParentId;
+    } else if (dupSubLocation === 'new') {
+      const newParentName = dupSubNewParentName.trim();
+      if (!newParentName) return;
+      const newParent = createWorkspace(newParentName);
+      saveWorkspaceData(newParent.id, getDefaultWorkspaceData());
+      targetParentId = newParent.id;
+    }
+
+    const meta = duplicateWorkspace(currentWorkspaceId, name, targetParentId);
+    const list = getWorkspaceList();
+    onSetWorkspaceList(list.workspaces);
+    onSetCurrentWorkspace(meta.id);
+    const data = getWorkspaceData(meta.id);
+    onLoadWorkspace({ ...(data ?? getDefaultWorkspaceData()), logo: data?.logo });
+
+    setDupSubOpen(false);
+    setDupSubName('');
+    setDupSubLocation('same');
+    setDupSubTargetParentId('');
+    setDupSubNewParentName('');
+  };
+
   // ---- Logo input handler (reused for new / sub / edit) ----
   const makeLogoHandler =
     (setter: (v: string | null) => void) =>
@@ -393,6 +476,17 @@ export default function WorkspaceSwitcher({
             <ListItemIcon><Edit fontSize="small" /></ListItemIcon>
             <ListItemText primary="Edit workspace" />
           </MenuItem>
+          {currentMeta?.parentId ? (
+            <MenuItem onClick={handleDupSubOpen}>
+              <ListItemIcon><ContentCopy fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Duplicate sub-workspace" />
+            </MenuItem>
+          ) : (
+            <MenuItem onClick={handleDupRootOpen}>
+              <ListItemIcon><ContentCopy fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Duplicate workspace" />
+            </MenuItem>
+          )}
           <MenuItem
             onClick={handleDeleteOpen}
             disabled={workspaceList.length <= 1}
@@ -609,6 +703,114 @@ export default function WorkspaceSwitcher({
           <DialogActions>
             <Button onClick={() => setEditOpen(false)}>Cancel</Button>
             <Button variant="contained" onClick={handleEditConfirm}>Save</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ---- Duplicate root workspace dialog ---- */}
+        <Dialog open={dupRootOpen} onClose={() => setDupRootOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ContentCopy fontSize="small" color="primary" />
+              Duplicate Workspace
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              fullWidth
+              label="Name for the duplicate"
+              value={dupRootName}
+              onChange={(e) => setDupRootName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleDupRootConfirm()}
+              sx={{ mt: 1 }}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDupRootOpen(false)}>Cancel</Button>
+            <Button variant="contained" onClick={handleDupRootConfirm} disabled={!dupRootName.trim()}>
+              Duplicate
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* ---- Duplicate sub-workspace dialog ---- */}
+        <Dialog open={dupSubOpen} onClose={() => setDupSubOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <ContentCopy fontSize="small" color="primary" />
+              Duplicate Sub-workspace
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              fullWidth
+              label="Name for the duplicate"
+              value={dupSubName}
+              onChange={(e) => setDupSubName(e.target.value)}
+              sx={{ mt: 1, mb: 2 }}
+            />
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Place duplicate under:
+            </Typography>
+            <RadioGroup
+              value={dupSubLocation}
+              onChange={(e) => setDupSubLocation(e.target.value as 'same' | 'different' | 'new')}
+            >
+              <FormControlLabel
+                value="same"
+                control={<Radio size="small" />}
+                label={`Same workspace (${workspaceList.find((w) => w.id === currentMeta?.parentId)?.name ?? 'current parent'})`}
+              />
+              <FormControlLabel
+                value="different"
+                control={<Radio size="small" />}
+                label="Different workspace"
+              />
+              {dupSubLocation === 'different' && (
+                <FormControl size="small" sx={{ ml: 3.5, mt: 0.5, mb: 1, minWidth: 220 }}>
+                  <InputLabel>Workspace</InputLabel>
+                  <Select
+                    value={dupSubTargetParentId}
+                    label="Workspace"
+                    onChange={(e) => setDupSubTargetParentId(e.target.value)}
+                    native={false}
+                  >
+                    {rootWorkspaces.map((w) => (
+                      <MenuItem key={w.id} value={w.id}>{w.name}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+              <FormControlLabel
+                value="new"
+                control={<Radio size="small" />}
+                label="New workspace"
+              />
+              {dupSubLocation === 'new' && (
+                <TextField
+                  size="small"
+                  label="New workspace name"
+                  value={dupSubNewParentName}
+                  onChange={(e) => setDupSubNewParentName(e.target.value)}
+                  sx={{ ml: 3.5, mt: 0.5, mb: 1, width: 220 }}
+                />
+              )}
+            </RadioGroup>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDupSubOpen(false)}>Cancel</Button>
+            <Button
+              variant="contained"
+              onClick={handleDupSubConfirm}
+              disabled={
+                !dupSubName.trim() ||
+                (dupSubLocation === 'different' && !dupSubTargetParentId) ||
+                (dupSubLocation === 'new' && !dupSubNewParentName.trim())
+              }
+            >
+              Duplicate
+            </Button>
           </DialogActions>
         </Dialog>
 
