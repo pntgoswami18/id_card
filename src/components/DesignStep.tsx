@@ -415,7 +415,7 @@ export default function DesignStep() {
           {canSaveOverwrite && (
             <MenuItem
               onClick={() => {
-                handleSave();
+                handleSave().catch(console.error);
                 setSaveMenuAnchor(null);
               }}
             >
