@@ -103,21 +103,9 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
           Templates are available in all workspaces.
         </Typography>
 
-        <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
-          Built-in templates
-        </Typography>
-        <List dense>
-          {BUILT_IN_TEMPLATES.map((t) => (
-            <ListItemButton key={t.id} onClick={() => handleSelectBuiltIn(t)}>
-              <ListItemText primary={t.name} secondary={`${t.elements.length} elements`} />
-            </ListItemButton>
-          ))}
-        </List>
-
         {userTemplates.length > 0 && (
           <>
-            <Divider sx={{ my: 1 }} />
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
               My templates
             </Typography>
             <List dense>
@@ -146,8 +134,20 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
                 </ListItem>
               ))}
             </List>
+            <Divider sx={{ my: 1 }} />
           </>
         )}
+
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
+          Built-in templates
+        </Typography>
+        <List dense>
+          {BUILT_IN_TEMPLATES.map((t) => (
+            <ListItemButton key={t.id} onClick={() => handleSelectBuiltIn(t)}>
+              <ListItemText primary={t.name} secondary={`${t.elements.length} elements`} />
+            </ListItemButton>
+          ))}
+        </List>
       </DialogContent>
 
       <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
