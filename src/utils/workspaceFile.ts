@@ -24,6 +24,11 @@ type WindowWithFSA = Window & {
 
 // ---- Workspace file format ----
 
+export interface WorkspaceChildEntry {
+  meta: { name: string; logo?: string };
+  data: WorkspaceData;
+}
+
 export interface WorkspaceFile {
   version: 1;
   app: 'id_card_generator';
@@ -31,6 +36,8 @@ export interface WorkspaceFile {
   savedAt: string;
   name: string;
   data: WorkspaceData;
+  /** Sub-workspaces belonging to this root workspace. */
+  children?: WorkspaceChildEntry[];
 }
 
 export function isWorkspaceFile(obj: unknown): obj is WorkspaceFile {
@@ -46,14 +53,26 @@ export function isWorkspaceFile(obj: unknown): obj is WorkspaceFile {
   );
 }
 
-function buildFileContent(name: string, data: WorkspaceData): string {
+function buildFileContent(
+  name: string,
+  data: WorkspaceData,
+  children?: WorkspaceChildEntry[],
+): string {
+  // Strip csvData from root and each child — large and trivial to re-upload.
+  const { csvData: _csv, ...rootData } = data;
   const file: WorkspaceFile = {
     version: 1,
     app: 'id_card_generator',
     type: 'workspace',
     savedAt: new Date().toISOString(),
     name,
-    data,
+    data: rootData,
+    ...(children && children.length > 0 && {
+      children: children.map(({ meta, data: cd }) => {
+        const { csvData: _c, ...childData } = cd;
+        return { meta, data: childData };
+      }),
+    }),
   };
   return JSON.stringify(file, null, 2);
 }
@@ -79,10 +98,11 @@ export async function writeWorkspaceToHandle(
   handle: WorkspaceFileHandle,
   name: string,
   data: WorkspaceData,
+  children?: WorkspaceChildEntry[],
 ): Promise<boolean> {
   try {
     const writable = await handle.createWritable();
-    await writable.write(buildFileContent(name, data));
+    await writable.write(buildFileContent(name, data, children));
     await writable.close();
     return true;
   } catch {
@@ -98,10 +118,11 @@ export async function writeWorkspaceToHandle(
 export async function saveWorkspaceWithPicker(
   name: string,
   data: WorkspaceData,
+  children?: WorkspaceChildEntry[],
 ): Promise<WorkspaceFileHandle | null> {
   const w = window as WindowWithFSA;
   if (!w.showSaveFilePicker) {
-    downloadWorkspaceFile(name, data);
+    downloadWorkspaceFile(name, data, children);
     return null;
   }
   try {
@@ -111,7 +132,7 @@ export async function saveWorkspaceWithPicker(
         { description: 'ID Card Workspace', accept: { 'application/json': ['.idcard'] } },
       ],
     });
-    const ok = await writeWorkspaceToHandle(handle, name, data);
+    const ok = await writeWorkspaceToHandle(handle, name, data, children);
     return ok ? handle : null;
   } catch (err) {
     if ((err as DOMException).name !== 'AbortError') console.error('Save workspace failed:', err);
@@ -120,8 +141,12 @@ export async function saveWorkspaceWithPicker(
 }
 
 /** Fallback download when File System Access API is not available. */
-export function downloadWorkspaceFile(name: string, data: WorkspaceData): void {
-  const blob = new Blob([buildFileContent(name, data)], { type: 'application/json' });
+export function downloadWorkspaceFile(
+  name: string,
+  data: WorkspaceData,
+  children?: WorkspaceChildEntry[],
+): void {
+  const blob = new Blob([buildFileContent(name, data, children)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

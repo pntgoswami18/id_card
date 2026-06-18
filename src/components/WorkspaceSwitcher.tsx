@@ -275,8 +275,21 @@ export default function WorkspaceSwitcher({
     handleClose();
     setSaving(true);
     try {
-      onSaveCurrent();
-      const handle = await saveWorkspaceWithPicker(buttonLabel, currentWorkspaceData);
+      onSaveCurrent(); // flush current to localStorage before reading child data
+
+      // Always save from the root perspective so children are included.
+      const rootId = currentMeta?.parentId ?? currentWorkspaceId;
+      const rootMeta = workspaceList.find((w) => w.id === rootId);
+      const rootData = getWorkspaceData(rootId) ?? getDefaultWorkspaceData();
+      const rootName = rootMeta?.name ?? 'Workspace';
+
+      const childMetas = workspaceList.filter((w) => w.parentId === rootId);
+      const children = childMetas.map((meta) => ({
+        meta: { name: meta.name, ...(meta.logo ? { logo: meta.logo } : {}) },
+        data: getWorkspaceData(meta.id) ?? getDefaultWorkspaceData(),
+      }));
+
+      const handle = await saveWorkspaceWithPicker(rootName, rootData, children);
       if (handle) fileHandleRef.current = handle;
     } finally {
       setSaving(false);
@@ -284,14 +297,43 @@ export default function WorkspaceSwitcher({
   };
 
   // ---- Open Workspace ----
+  const restoreWorkspaceFile = (wsFile: import('../utils/workspaceFile').WorkspaceFile) => {
+    // Create a fresh root workspace entry so the opened file never clobbers an existing workspace.
+    const rootId = createWorkspaceId();
+    const rootEntry: WorkspaceMeta = { id: rootId, name: wsFile.name };
+    const list = getWorkspaceList();
+    const newWorkspaces: WorkspaceMeta[] = [...list.workspaces, rootEntry];
+
+    saveWorkspaceData(rootId, wsFile.data);
+
+    if (wsFile.children && wsFile.children.length > 0) {
+      for (const child of wsFile.children) {
+        const childId = createWorkspaceId();
+        const childEntry: WorkspaceMeta = {
+          id: childId,
+          name: child.meta.name,
+          parentId: rootId,
+          ...(child.meta.logo ? { logo: child.meta.logo } : {}),
+        };
+        newWorkspaces.push(childEntry);
+        saveWorkspaceData(childId, child.data);
+      }
+    }
+
+    list.workspaces = newWorkspaces;
+    list.currentId = rootId;
+    saveWorkspaceList(list);
+
+    onSetWorkspaceList(newWorkspaces);
+    onSetCurrentWorkspace(rootId);
+    onLoadWorkspace(wsFile.data);
+  };
+
   const handleOpenWorkspace = async () => {
     handleClose();
     if (hasOpenFilePicker()) {
       const wsFile = await openWorkspaceWithPicker();
-      if (wsFile) {
-        onLoadWorkspace(wsFile.data);
-        onSaveCurrent(wsFile.data);
-      }
+      if (wsFile) restoreWorkspaceFile(wsFile);
     } else {
       openFileInputRef.current?.click();
     }
@@ -306,8 +348,7 @@ export default function WorkspaceSwitcher({
       setOpenError('Invalid workspace file. Please select a valid .idcard file.');
       return;
     }
-    onLoadWorkspace(wsFile.data);
-    onSaveCurrent(wsFile.data);
+    restoreWorkspaceFile(wsFile);
   };
 
   // ---- Duplicate root workspace ----
