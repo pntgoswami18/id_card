@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -14,8 +13,6 @@ interface CsvUploadProps {
 }
 
 export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: CsvUploadProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -52,15 +49,16 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
           </Box>
         </Box>
       )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".csv,text/csv"
-        onChange={handleFileChange}
-        style={{ display: 'none' }}
-      />
-      <Button variant="contained" onClick={() => inputRef.current?.click()}>
+      {/* Use component="label" so the browser natively triggers the file dialog —
+          no JavaScript ref.click() needed, works reliably across all browsers. */}
+      <Button variant="contained" component="label">
         Upload CSV
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
       </Button>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
         First row should be column headers.
