@@ -157,9 +157,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, watermarkEditMode: action.payload };
     case 'LOAD_WORKSPACE_STATE': {
       const p = action.payload;
+      const loadedRecords = p.records ?? state.records;
+      const loadedMapping = p.columnMapping ?? state.columnMapping;
+      const hasMappedData =
+        loadedRecords.length > 0 && Object.keys(loadedMapping).length > 0;
       return {
         ...state,
-        activeStep: 0, // always land on Design when switching workspaces
+        activeStep: hasMappedData ? 2 : 0, // jump to Preview if CSV is already mapped
         ...(p.template != null && { template: p.template }),
         ...(p.records != null && { records: p.records }),
         ...(p.columnMapping != null && { columnMapping: p.columnMapping }),
