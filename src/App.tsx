@@ -33,6 +33,7 @@ import {
   getWorkspaceList,
   getWorkspaceData,
   saveWorkspaceData,
+  getDefaultWorkspaceData,
 } from './utils/workspaceStorage';
 import type { WorkspaceData, WorkspaceMeta } from './utils/workspaceStorage';
 import {
@@ -188,18 +189,61 @@ function AppContent() {
             onSetWorkspaceLogo={(logo: string | undefined) => dispatch({ type: 'SET_WORKSPACE_LOGO', payload: logo })}
           />
         </Box>
-        <Stepper activeStep={activeStep} sx={{ pt: 2, pb: 4, flexShrink: 0 }} aria-label="Workflow steps">
+        <Stepper
+          activeStep={activeStep}
+          sx={{
+            pt: 2, pb: 3, flexShrink: 0,
+            // Remove the default connector line between steps
+            '& .MuiStepConnector-line': { borderColor: 'transparent' },
+          }}
+          aria-label="Workflow steps"
+        >
           {steps.map((label, index) => {
             const needsRecords = index >= 2;
             const isDisabled = needsRecords && records.length === 0;
+            const isActive = index === activeStep;
+            const isCompleted = index < activeStep;
             return (
-              <Step key={label} completed={index < activeStep}>
+              <Step key={label} completed={isCompleted}>
                 <StepButton
-                  onClick={() => !isDisabled && dispatch({ type: 'SET_ACTIVE_STEP', payload: index })}
+                  onClick={() => dispatch({ type: 'SET_ACTIVE_STEP', payload: index })}
                   disabled={isDisabled}
                   aria-label={`Go to ${label} step`}
+                  sx={{
+                    borderRadius: 2,
+                    px: 2,
+                    py: 1,
+                    transition: 'background 0.15s, box-shadow 0.15s',
+                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                    ...(isActive && {
+                      bgcolor: 'primary.main',
+                      boxShadow: 2,
+                      '& .MuiStepLabel-label': { color: 'primary.contrastText', fontWeight: 700 },
+                      '& .MuiStepIcon-root': { color: 'primary.contrastText' },
+                      '& .MuiStepIcon-text': { fill: 'primary.main' },
+                    }),
+                    ...(!isActive && !isDisabled && {
+                      '&:hover': {
+                        bgcolor: 'action.hover',
+                        boxShadow: 1,
+                      },
+                    }),
+                  }}
                 >
-                  <StepLabel>{label}</StepLabel>
+                  <StepLabel
+                    sx={{
+                      '& .MuiStepLabel-label': {
+                        fontWeight: isActive ? 700 : 500,
+                        color: isDisabled
+                          ? 'text.disabled'
+                          : isActive
+                          ? 'primary.contrastText'
+                          : 'text.primary',
+                      },
+                    }}
+                  >
+                    {label}
+                  </StepLabel>
                 </StepButton>
               </Step>
             );

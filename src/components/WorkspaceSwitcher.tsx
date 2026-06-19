@@ -298,6 +298,7 @@ export default function WorkspaceSwitcher({
 
   // ---- Open Workspace ----
   const restoreWorkspaceFile = (wsFile: import('../utils/workspaceFile').WorkspaceFile) => {
+    onSaveCurrent(); // flush any unsaved in-memory edits before switching away
     // Create a fresh root workspace entry so the opened file never clobbers an existing workspace.
     const rootId = createWorkspaceId();
     const rootEntry: WorkspaceMeta = { id: rootId, name: wsFile.name };
