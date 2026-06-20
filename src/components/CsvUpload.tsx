@@ -90,14 +90,16 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
         }}
       >
         Upload CSV
-        <input
-          id={inputId}
-          type="file"
-          accept=".csv,text/csv"
-          onChange={handleFileChange}
-          hidden
-        />
       </Box>
+      {/* Input lives outside the label — only linked via htmlFor/id.
+          display:none keeps it invisible but fully activatable by the label click. */}
+      <input
+        id={inputId}
+        type="file"
+        accept=".csv,text/csv"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
 
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
         First row should be column headers.

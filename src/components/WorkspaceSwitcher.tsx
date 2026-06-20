@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useId } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
@@ -123,10 +123,10 @@ export default function WorkspaceSwitcher({
   const [openError, setOpenError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const newLogoInputRef = useRef<HTMLInputElement>(null);
-  const newSubLogoInputRef = useRef<HTMLInputElement>(null);
-  const editLogoInputRef = useRef<HTMLInputElement>(null);
-  const openFileInputRef = useRef<HTMLInputElement>(null);
+  const newLogoInputId = useId();
+  const newSubLogoInputId = useId();
+  const editLogoInputId = useId();
+  const openFileInputId = useId();
 
   // ---- Derived tree data ----
   const currentMeta = workspaceList.find((w) => w.id === currentWorkspaceId);
@@ -336,7 +336,7 @@ export default function WorkspaceSwitcher({
       const wsFile = await openWorkspaceWithPicker();
       if (wsFile) restoreWorkspaceFile(wsFile);
     } else {
-      openFileInputRef.current?.click();
+      document.getElementById(openFileInputId)?.click();
     }
   };
 
@@ -597,7 +597,7 @@ export default function WorkspaceSwitcher({
 
         {/* Hidden file input for open fallback */}
         <input
-          ref={openFileInputRef}
+          id={openFileInputId}
           type="file"
           accept=".idcard,.json,application/json"
           style={{ display: 'none' }}
@@ -634,7 +634,7 @@ export default function WorkspaceSwitcher({
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <input
-                ref={newLogoInputRef}
+                id={newLogoInputId}
                 type="file"
                 accept="image/*"
                 style={{ display: 'none' }}
@@ -643,13 +643,13 @@ export default function WorkspaceSwitcher({
               {newLogo ? (
                 <>
                   <Avatar src={newLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
-                  <Button size="small" onClick={() => newLogoInputRef.current?.click()}>Change</Button>
+                  <Box component="label" htmlFor={newLogoInputId} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>Change</Box>
                   <Button size="small" color="secondary" onClick={() => setNewLogo(null)}>Remove</Button>
                 </>
               ) : (
-                <Button size="small" variant="outlined" startIcon={<Image />} onClick={() => newLogoInputRef.current?.click()}>
-                  Choose Image
-                </Button>
+                <Box component="label" htmlFor={newLogoInputId} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' } }}>
+                  <Image sx={{ fontSize: '1rem' }} /> Choose Image
+                </Box>
               )}
             </Box>
           </DialogContent>
@@ -692,7 +692,7 @@ export default function WorkspaceSwitcher({
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <input
-                ref={newSubLogoInputRef}
+                id={newSubLogoInputId}
                 type="file"
                 accept="image/*"
                 style={{ display: 'none' }}
@@ -701,13 +701,13 @@ export default function WorkspaceSwitcher({
               {newSubLogo ? (
                 <>
                   <Avatar src={newSubLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
-                  <Button size="small" onClick={() => newSubLogoInputRef.current?.click()}>Change</Button>
+                  <Box component="label" htmlFor={newSubLogoInputId} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>Change</Box>
                   <Button size="small" color="secondary" onClick={() => setNewSubLogo(null)}>Remove</Button>
                 </>
               ) : (
-                <Button size="small" variant="outlined" startIcon={<Image />} onClick={() => newSubLogoInputRef.current?.click()}>
-                  Choose Image
-                </Button>
+                <Box component="label" htmlFor={newSubLogoInputId} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' } }}>
+                  <Image sx={{ fontSize: '1rem' }} /> Choose Image
+                </Box>
               )}
             </Box>
           </DialogContent>
@@ -735,7 +735,7 @@ export default function WorkspaceSwitcher({
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>Logo</Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <input
-                ref={editLogoInputRef}
+                id={editLogoInputId}
                 type="file"
                 accept="image/*"
                 style={{ display: 'none' }}
@@ -744,13 +744,13 @@ export default function WorkspaceSwitcher({
               {editLogo ? (
                 <>
                   <Avatar src={editLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
-                  <Button size="small" onClick={() => editLogoInputRef.current?.click()}>Change</Button>
+                  <Box component="label" htmlFor={editLogoInputId} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>Change</Box>
                   <Button size="small" color="secondary" onClick={() => setEditLogo(null)}>Remove</Button>
                 </>
               ) : (
-                <Button size="small" variant="outlined" startIcon={<Image />} onClick={() => editLogoInputRef.current?.click()}>
-                  Choose Image
-                </Button>
+                <Box component="label" htmlFor={editLogoInputId} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' } }}>
+                  <Image sx={{ fontSize: '1rem' }} /> Choose Image
+                </Box>
               )}
             </Box>
           </DialogContent>

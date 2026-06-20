@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useId } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -16,9 +17,7 @@ import FileOpenIcon from '@mui/icons-material/FileOpen';
 import { BUILT_IN_TEMPLATES } from '../constants/templates';
 import { loadUserTemplates, deleteUserTemplate, saveUserTemplate } from '../utils/userTemplates';
 import {
-  openTemplateWithPicker,
   readTemplateFile,
-  hasOpenFilePicker,
 } from '../utils/workspaceFile';
 import type { Template, UserTemplateMeta } from '../types';
 
@@ -33,7 +32,7 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
   const [userTemplates, setUserTemplates] = useState(() => loadUserTemplates());
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
+  const importInputId = useId();
 
   // Refresh template list every time the dialog opens
   useEffect(() => {
@@ -70,17 +69,6 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
     setUserTemplates(loadUserTemplates());
     onSelect(imported, { type: 'user', id: imported.id });
     onClose();
-  };
-
-  const handleImportFromFile = async () => {
-    if (hasOpenFilePicker()) {
-      const file = await openTemplateWithPicker();
-      if (file) {
-        importAndSelect(file.template);
-      }
-    } else {
-      importInputRef.current?.click();
-    }
   };
 
   const handleImportInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,25 +139,34 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
       </DialogContent>
 
       <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
-        <Button
-          startIcon={<FileOpenIcon />}
-          onClick={handleImportFromFile}
-          variant="outlined"
-          size="small"
+        <Box
+          component="label"
+          htmlFor={importInputId}
+          sx={{
+            display: 'inline-flex', alignItems: 'center', gap: 0.5,
+            cursor: 'pointer', userSelect: 'none',
+            px: 1.5, py: 0.5, borderRadius: 1, fontSize: '0.8125rem',
+            fontWeight: 500, lineHeight: 1.75, letterSpacing: '0.02857em',
+            textTransform: 'uppercase',
+            color: 'primary.main',
+            border: '1px solid',
+            borderColor: 'primary.main',
+            transition: 'background-color 0.2s',
+            '&:hover': { bgcolor: 'primary.main', color: 'primary.contrastText' },
+          }}
         >
+          <FileOpenIcon sx={{ fontSize: '1rem' }} />
           Import from file
-        </Button>
+        </Box>
+        <input
+          id={importInputId}
+          type="file"
+          accept=".idtemplate,.json,application/json"
+          style={{ display: 'none' }}
+          onChange={handleImportInputChange}
+        />
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
-
-      {/* Hidden fallback file input for browsers without FSA */}
-      <input
-        ref={importInputRef}
-        type="file"
-        accept=".idtemplate,.json,application/json"
-        style={{ display: 'none' }}
-        onChange={handleImportInputChange}
-      />
 
       {/* Delete confirmation */}
       <Dialog open={deleteConfirm !== null} onClose={() => setDeleteConfirm(null)}>

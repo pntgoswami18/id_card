@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useId } from 'react';
 import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -37,7 +37,7 @@ export default function CardEditDialog({
   photoDisplayNames,
 }: CardEditDialogProps) {
   const [values, setValues] = useState<Record<string, string>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputId = useId();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -139,7 +139,7 @@ export default function CardEditDialog({
             );
           })}
           <input
-            ref={fileInputRef}
+            id={photoInputId}
             type="file"
             accept="image/*"
             style={{ display: 'none' }}
@@ -149,9 +149,21 @@ export default function CardEditDialog({
             <Button variant="outlined" fullWidth onClick={onTakePhoto}>
               Take Photo
             </Button>
-            <Button variant="outlined" fullWidth onClick={() => fileInputRef.current?.click()}>
+            <Box
+              component="label"
+              htmlFor={photoInputId}
+              sx={{
+                flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', userSelect: 'none', px: 2, py: 0.75, borderRadius: 1,
+                fontSize: '0.875rem', fontWeight: 500, lineHeight: 1.75,
+                letterSpacing: '0.02857em', textTransform: 'uppercase',
+                color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
+                transition: 'background-color 0.2s',
+                '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
+              }}
+            >
               Upload Photo
-            </Button>
+            </Box>
           </Box>
         </Box>
       </DialogContent>

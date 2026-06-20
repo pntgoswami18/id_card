@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useId, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Tabs from '@mui/material/Tabs';
@@ -41,8 +41,8 @@ export default function BackgroundWatermarkPanel({
   onWatermarkModeEnter,
 }: BackgroundWatermarkPanelProps) {
   const [tab, setTab] = useState(0);
-  const backgroundFileInputRef = useRef<HTMLInputElement>(null);
-  const watermarkFileInputRef = useRef<HTMLInputElement>(null);
+  const bgInputId = useId();
+  const wmInputId = useId();
 
   useEffect(() => {
     if (tab === 1) onWatermarkModeEnter?.();
@@ -187,21 +187,28 @@ export default function BackgroundWatermarkPanel({
           {(background?.type ?? 'solid') === 'image' && (
             <Box sx={{ mt: 1 }}>
               <input
-                ref={backgroundFileInputRef}
+                id={bgInputId}
                 type="file"
                 accept="image/*"
                 style={{ display: 'none' }}
                 onChange={handleBackgroundFileChange}
               />
-              <Button
-                fullWidth
-                variant="outlined"
-                size="small"
-                sx={{ mb: 1 }}
-                onClick={() => backgroundFileInputRef.current?.click()}
+              <Box
+                component="label"
+                htmlFor={bgInputId}
+                sx={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '100%', cursor: 'pointer', userSelect: 'none',
+                  px: 2, py: 0.5, mb: 1, borderRadius: 1,
+                  fontSize: '0.8125rem', fontWeight: 500, lineHeight: 1.75,
+                  letterSpacing: '0.02857em', textTransform: 'uppercase',
+                  color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
+                  transition: 'background-color 0.2s',
+                  '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
+                }}
               >
                 Upload Image From Device
-              </Button>
+              </Box>
               <TextField
                 fullWidth
                 size="small"
@@ -282,21 +289,28 @@ export default function BackgroundWatermarkPanel({
               {watermark.type === 'image' && (
                 <Box sx={{ mb: 1 }}>
                   <input
-                    ref={watermarkFileInputRef}
+                    id={wmInputId}
                     type="file"
                     accept="image/*"
                     style={{ display: 'none' }}
                     onChange={handleWatermarkFileChange}
                   />
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                    sx={{ mb: 1 }}
-                    onClick={() => watermarkFileInputRef.current?.click()}
+                  <Box
+                    component="label"
+                    htmlFor={wmInputId}
+                    sx={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '100%', cursor: 'pointer', userSelect: 'none',
+                      px: 2, py: 0.5, mb: 1, borderRadius: 1,
+                      fontSize: '0.8125rem', fontWeight: 500, lineHeight: 1.75,
+                      letterSpacing: '0.02857em', textTransform: 'uppercase',
+                      color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
+                      transition: 'background-color 0.2s',
+                      '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
+                    }}
                   >
                     Upload Image From Device
-                  </Button>
+                  </Box>
                   <TextField
                     fullWidth
                     size="small"
