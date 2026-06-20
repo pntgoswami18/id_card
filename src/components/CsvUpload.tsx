@@ -1,6 +1,5 @@
-import { useRef } from 'react';
+import { useId } from 'react';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import type { ParsedCsv } from '../utils/csv';
@@ -14,7 +13,9 @@ interface CsvUploadProps {
 }
 
 export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: CsvUploadProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Unique id so the native <label htmlFor> association is unambiguous even if
+  // more than one CsvUpload is ever mounted.
+  const inputId = useId();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,24 +53,52 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
           </Box>
         </Box>
       )}
+
       {/*
-        Use a real <button> onClick → ref.click() so the file dialog open is a direct
-        synchronous user-gesture call. The label/component="label" patterns both fail in
-        Chrome: MUI adds role="button" to non-button components, which causes the browser
-        to treat the inner span as an interactive widget that consumes the click, preventing
-        the label from triggering the file input. Using position:absolute/opacity:0 instead
-        of display:none ensures Chrome treats the programmatic .click() as a trusted gesture.
+        Native <label htmlFor> + hidden <input>. This is the most robust file-dialog
+        trigger and deliberately avoids every failure mode we hit before:
+          - No ref.click() → no user-activation/timing risk, works on every real click.
+          - Not an MUI Button/ButtonBase → no injected role="button".
+          - No interactive child element inside the label → nothing can consume the
+            click before the browser forwards it to the input.
+        The label is a plain styled element; clicking anywhere on it opens the picker.
       */}
-      <Button variant="contained" onClick={() => inputRef.current?.click()}>
+      <Box
+        component="label"
+        htmlFor={inputId}
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          userSelect: 'none',
+          px: 2,
+          py: 0.75,
+          minWidth: 64,
+          borderRadius: 1,
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          lineHeight: 1.75,
+          letterSpacing: '0.02857em',
+          textTransform: 'uppercase',
+          color: 'primary.contrastText',
+          bgcolor: 'primary.main',
+          boxShadow: 1,
+          transition: 'background-color 0.2s, box-shadow 0.2s',
+          '&:hover': { bgcolor: 'primary.dark', boxShadow: 2 },
+          '&:active': { boxShadow: 0 },
+        }}
+      >
         Upload CSV
-      </Button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".csv,text/csv"
-        onChange={handleFileChange}
-        style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-      />
+        <input
+          id={inputId}
+          type="file"
+          accept=".csv,text/csv"
+          onChange={handleFileChange}
+          hidden
+        />
+      </Box>
+
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
         First row should be column headers.
       </Typography>
