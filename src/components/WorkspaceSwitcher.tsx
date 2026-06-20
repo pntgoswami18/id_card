@@ -473,53 +473,52 @@ export default function WorkspaceSwitcher({
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          {/* Workspace tree — React.Fragment preserves valid ul > li DOM structure */}
-          {rootWorkspaces.map((w) => (
-            <React.Fragment key={w.id}>
-              {/* Parent (root) row */}
-              <MenuItem selected={w.id === currentWorkspaceId} onClick={() => handleSwitch(w.id)}>
-                {w.logo ? (
-                  <Avatar src={w.logo} sx={{ width: 24, height: 24, mr: 1.5 }} variant="rounded" />
-                ) : (
-                  <ListItemIcon sx={{ minWidth: 40 }}><FolderOpen fontSize="small" /></ListItemIcon>
-                )}
-                <ListItemText primary={w.name} />
-              </MenuItem>
+          {/* Workspace tree — flatMap to avoid Fragment as direct Menu child (MUI limitation) */}
+          {rootWorkspaces.flatMap((w) => [
+            /* Parent (root) row */
+            <MenuItem key={`root-${w.id}`} selected={w.id === currentWorkspaceId} onClick={() => handleSwitch(w.id)}>
+              {w.logo ? (
+                <Avatar src={w.logo} sx={{ width: 24, height: 24, mr: 1.5 }} variant="rounded" />
+              ) : (
+                <ListItemIcon sx={{ minWidth: 40 }}><FolderOpen fontSize="small" /></ListItemIcon>
+              )}
+              <ListItemText primary={w.name} />
+            </MenuItem>,
 
-              {/* Children (indented) */}
-              {(childrenByParent[w.id] ?? []).map((child) => (
-                <MenuItem
-                  key={child.id}
-                  selected={child.id === currentWorkspaceId}
-                  onClick={() => handleSwitch(child.id)}
-                  sx={{ pl: 4 }}
-                >
-                  {child.logo ? (
-                    <Avatar src={child.logo} sx={{ width: 20, height: 20, mr: 1.5 }} variant="rounded" />
-                  ) : (
-                    <ListItemIcon sx={{ minWidth: 36 }}>
-                      <SubdirectoryArrowRight fontSize="small" sx={{ color: 'text.secondary' }} />
-                    </ListItemIcon>
-                  )}
-                  <ListItemText primary={child.name} />
-                </MenuItem>
-              ))}
-
-              {/* Add sub-workspace row */}
+            /* Children (indented) */
+            ...(childrenByParent[w.id] ?? []).map((child) => (
               <MenuItem
-                onClick={() => handleNewSubWorkspace(w.id)}
-                sx={{ pl: 4, py: 0.5 }}
+                key={child.id}
+                selected={child.id === currentWorkspaceId}
+                onClick={() => handleSwitch(child.id)}
+                sx={{ pl: 4 }}
               >
-                <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>
-                  <Add fontSize="small" />
-                </ListItemIcon>
-                <ListItemText
-                  primary="Add sub-workspace"
-                  primaryTypographyProps={{ variant: 'body2', color: 'primary' }}
-                />
+                {child.logo ? (
+                  <Avatar src={child.logo} sx={{ width: 20, height: 20, mr: 1.5 }} variant="rounded" />
+                ) : (
+                  <ListItemIcon sx={{ minWidth: 36 }}>
+                    <SubdirectoryArrowRight fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </ListItemIcon>
+                )}
+                <ListItemText primary={child.name} />
               </MenuItem>
-            </React.Fragment>
-          ))}
+            )),
+
+            /* Add sub-workspace row */
+            <MenuItem
+              key={`add-sub-${w.id}`}
+              onClick={() => handleNewSubWorkspace(w.id)}
+              sx={{ pl: 4, py: 0.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>
+                <Add fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary="Add sub-workspace"
+                primaryTypographyProps={{ variant: 'body2', color: 'primary' }}
+              />
+            </MenuItem>,
+          ])}
 
           <Divider />
 
