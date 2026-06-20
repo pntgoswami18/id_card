@@ -49,12 +49,13 @@ import {
 } from '../utils/workspaceStorage';
 import {
   saveWorkspaceWithPicker,
-  openWorkspaceWithPicker,
+  openWorkspaceFilePicker,
   readWorkspaceFile,
   hasOpenFilePicker,
   hasSaveFilePicker,
   type WorkspaceFileHandle,
 } from '../utils/workspaceFile';
+import { readFileAsDataUrl } from '../utils/file';
 
 interface WorkspaceSwitcherProps {
   workspaceList: WorkspaceMeta[];
@@ -69,15 +70,6 @@ interface WorkspaceSwitcherProps {
   onSetCurrentWorkspace: (id: string) => void;
   onSetWorkspaceList: (list: WorkspaceMeta[]) => void;
   onSetWorkspaceLogo: (logo: string | undefined) => void;
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 export default function WorkspaceSwitcher({
@@ -333,8 +325,14 @@ export default function WorkspaceSwitcher({
   const handleOpenWorkspace = async () => {
     handleClose();
     if (hasOpenFilePicker()) {
-      const wsFile = await openWorkspaceWithPicker();
-      if (wsFile) restoreWorkspaceFile(wsFile);
+      const file = await openWorkspaceFilePicker();
+      if (!file) return; // cancelled
+      const wsFile = await readWorkspaceFile(file);
+      if (wsFile) {
+        restoreWorkspaceFile(wsFile);
+      } else {
+        setOpenError('Invalid workspace file. Please select a valid .idcard file.');
+      }
     } else {
       document.getElementById(openFileInputId)?.click();
     }
@@ -643,11 +641,11 @@ export default function WorkspaceSwitcher({
               {newLogo ? (
                 <>
                   <Avatar src={newLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
-                  <Box component="label" htmlFor={newLogoInputId} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>Change</Box>
+                  <Box component="label" htmlFor={newLogoInputId} tabIndex={0} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' } }}>Change</Box>
                   <Button size="small" color="secondary" onClick={() => setNewLogo(null)}>Remove</Button>
                 </>
               ) : (
-                <Box component="label" htmlFor={newLogoInputId} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' } }}>
+                <Box component="label" htmlFor={newLogoInputId} tabIndex={0} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' } }}>
                   <Image sx={{ fontSize: '1rem' }} /> Choose Image
                 </Box>
               )}
@@ -701,11 +699,11 @@ export default function WorkspaceSwitcher({
               {newSubLogo ? (
                 <>
                   <Avatar src={newSubLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
-                  <Box component="label" htmlFor={newSubLogoInputId} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>Change</Box>
+                  <Box component="label" htmlFor={newSubLogoInputId} tabIndex={0} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' } }}>Change</Box>
                   <Button size="small" color="secondary" onClick={() => setNewSubLogo(null)}>Remove</Button>
                 </>
               ) : (
-                <Box component="label" htmlFor={newSubLogoInputId} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' } }}>
+                <Box component="label" htmlFor={newSubLogoInputId} tabIndex={0} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' } }}>
                   <Image sx={{ fontSize: '1rem' }} /> Choose Image
                 </Box>
               )}
@@ -744,11 +742,11 @@ export default function WorkspaceSwitcher({
               {editLogo ? (
                 <>
                   <Avatar src={editLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
-                  <Box component="label" htmlFor={editLogoInputId} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}>Change</Box>
+                  <Box component="label" htmlFor={editLogoInputId} tabIndex={0} sx={{ fontSize: '0.8125rem', cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' } }}>Change</Box>
                   <Button size="small" color="secondary" onClick={() => setEditLogo(null)}>Remove</Button>
                 </>
               ) : (
-                <Box component="label" htmlFor={editLogoInputId} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' } }}>
+                <Box component="label" htmlFor={editLogoInputId} tabIndex={0} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 500, px: 1, py: 0.5, borderRadius: 1, color: 'primary.main', border: '1px solid', borderColor: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.02857em', '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' }, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' } }}>
                   <Image sx={{ fontSize: '1rem' }} /> Choose Image
                 </Box>
               )}

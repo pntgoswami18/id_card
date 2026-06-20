@@ -152,6 +152,7 @@ export default function CardEditDialog({
             <Box
               component="label"
               htmlFor={photoInputId}
+              tabIndex={0}
               sx={{
                 flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', userSelect: 'none', px: 2, py: 0.75, borderRadius: 1,
@@ -160,6 +161,7 @@ export default function CardEditDialog({
                 color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
                 transition: 'background-color 0.2s',
                 '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
+                '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
               }}
             >
               Upload Photo

@@ -54,18 +54,11 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
         </Box>
       )}
 
-      {/*
-        Native <label htmlFor> + hidden <input>. This is the most robust file-dialog
-        trigger and deliberately avoids every failure mode we hit before:
-          - No ref.click() → no user-activation/timing risk, works on every real click.
-          - Not an MUI Button/ButtonBase → no injected role="button".
-          - No interactive child element inside the label → nothing can consume the
-            click before the browser forwards it to the input.
-        The label is a plain styled element; clicking anywhere on it opens the picker.
-      */}
+      {/* Native label/input association — no programmatic click() needed. */}
       <Box
         component="label"
         htmlFor={inputId}
+        tabIndex={0}
         sx={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -87,6 +80,7 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
           transition: 'background-color 0.2s, box-shadow 0.2s',
           '&:hover': { bgcolor: 'primary.dark', boxShadow: 2 },
           '&:active': { boxShadow: 0 },
+          '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
         }}
       >
         Upload CSV

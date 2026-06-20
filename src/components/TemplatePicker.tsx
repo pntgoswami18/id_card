@@ -142,6 +142,7 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
         <Box
           component="label"
           htmlFor={importInputId}
+          tabIndex={0}
           sx={{
             display: 'inline-flex', alignItems: 'center', gap: 0.5,
             cursor: 'pointer', userSelect: 'none',
@@ -153,6 +154,7 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
             borderColor: 'primary.main',
             transition: 'background-color 0.2s',
             '&:hover': { bgcolor: 'primary.main', color: 'primary.contrastText' },
+            '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
           }}
         >
           <FileOpenIcon sx={{ fontSize: '1rem' }} />

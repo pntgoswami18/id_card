@@ -47,7 +47,7 @@ export function isWorkspaceFile(obj: unknown): obj is WorkspaceFile {
     o.version === 1 &&
     o.app === 'id_card_generator' &&
     o.type === 'workspace' &&
-    typeof o.name === 'string' &&
+    typeof o.name === 'string' && o.name.length <= 500 &&
     !!o.data &&
     typeof o.data === 'object'
   );
@@ -178,6 +178,28 @@ export async function openWorkspaceWithPicker(): Promise<WorkspaceFile | null> {
   }
 }
 
+/**
+ * Open the OS file picker and return the raw File object.
+ * Returns null if cancelled or the API is unavailable.
+ * Unlike openWorkspaceWithPicker, does NOT parse — callers can call readWorkspaceFile
+ * themselves and show their own error when the result is null.
+ */
+export async function openWorkspaceFilePicker(): Promise<File | null> {
+  const w = window as WindowWithFSA;
+  if (!w.showOpenFilePicker) return null;
+  try {
+    const [handle] = await w.showOpenFilePicker({
+      types: [
+        { description: 'ID Card Workspace', accept: { 'application/json': ['.idcard', '.json'] } },
+      ],
+    });
+    return handle.getFile();
+  } catch (err) {
+    if ((err as DOMException).name !== 'AbortError') console.error('Open workspace failed:', err);
+    return null;
+  }
+}
+
 /** Parse a File (from a hidden <input type="file">) into a WorkspaceFile. Returns null if invalid. */
 export async function readWorkspaceFile(file: File): Promise<WorkspaceFile | null> {
   try {
@@ -207,7 +229,7 @@ export function isTemplateFile(obj: unknown): obj is TemplateFile {
     o.version === 1 &&
     o.app === 'id_card_generator' &&
     o.type === 'template' &&
-    typeof o.name === 'string' &&
+    typeof o.name === 'string' && o.name.length <= 500 &&
     !!o.template &&
     typeof o.template === 'object'
   );
@@ -255,30 +277,6 @@ export async function saveTemplateWithPicker(name: string, template: Template): 
   } catch (err) {
     if ((err as DOMException).name !== 'AbortError') console.error('Save template failed:', err);
     return false;
-  }
-}
-
-/**
- * Open the OS file picker and read a template file.
- * Returns null if cancelled, not supported, or invalid format.
- */
-export async function openTemplateWithPicker(): Promise<TemplateFile | null> {
-  const w = window as WindowWithFSA;
-  if (!w.showOpenFilePicker) return null;
-  try {
-    const [handle] = await w.showOpenFilePicker({
-      types: [
-        {
-          description: 'ID Card Template',
-          accept: { 'application/json': ['.idtemplate', '.json'] },
-        },
-      ],
-    });
-    const file = await handle.getFile();
-    return readTemplateFile(file);
-  } catch (err) {
-    if ((err as DOMException).name !== 'AbortError') console.error('Open template failed:', err);
-    return null;
   }
 }
 

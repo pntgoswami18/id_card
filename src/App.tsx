@@ -91,7 +91,7 @@ function AppContent() {
       csvData,
     };
     const t = setTimeout(() => {
-      saveWorkspaceData(currentWorkspaceId, data);
+      saveWorkspaceData(currentWorkspaceId, { ...data, csvData: null });
       if (autoSaveToFile && fileHandleRef.current) {
         // Always autosave from the root so children are included in the file.
         const rootId = workspaceList.find((w) => w.id === currentWorkspaceId)?.parentId ?? currentWorkspaceId;
@@ -179,11 +179,14 @@ function AppContent() {
             fileHandleRef={fileHandleRef}
             onSaveCurrent={(overrides?: Partial<WorkspaceData>) => {
               if (currentWorkspaceId) {
-                const data = overrides ? { ...currentWorkspaceData, ...overrides } : currentWorkspaceData;
-                saveWorkspaceData(currentWorkspaceId, data);
+                const toSave = overrides ? { ...currentWorkspaceData, ...overrides } : currentWorkspaceData;
+                saveWorkspaceData(currentWorkspaceId, { ...toSave, csvData: null });
               }
             }}
-            onLoadWorkspace={(data: WorkspaceData) => dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: data })}
+            onLoadWorkspace={(data: WorkspaceData) => {
+              skipAutoSaveRef.current = true;
+              dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: data });
+            }}
             onSetCurrentWorkspace={(id: string) => dispatch({ type: 'SET_CURRENT_WORKSPACE', payload: id })}
             onSetWorkspaceList={(list: WorkspaceMeta[]) => dispatch({ type: 'SET_WORKSPACE_LIST', payload: list })}
             onSetWorkspaceLogo={(logo: string | undefined) => dispatch({ type: 'SET_WORKSPACE_LOGO', payload: logo })}
@@ -254,7 +257,12 @@ function AppContent() {
             <Button
               variant="outlined"
               size="small"
-              onClick={() => dispatch({ type: 'SET_ACTIVE_STEP', payload: activeStep - 1 })}
+              onClick={() => {
+                const target = activeStep - 1;
+                if (target < 2 || records.length > 0) {
+                  dispatch({ type: 'SET_ACTIVE_STEP', payload: target });
+                }
+              }}
               aria-label="Go to previous step"
             >
               Back

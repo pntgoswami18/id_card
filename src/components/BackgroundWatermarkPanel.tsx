@@ -11,15 +11,7 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Slider from '@mui/material/Slider';
 import type { BackgroundConfig, BackgroundType, WatermarkConfig, WatermarkType } from '../types';
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
+import { readFileAsDataUrl } from '../utils/file';
 
 interface BackgroundWatermarkPanelProps {
   background: BackgroundConfig | null;
@@ -196,6 +188,7 @@ export default function BackgroundWatermarkPanel({
               <Box
                 component="label"
                 htmlFor={bgInputId}
+                tabIndex={0}
                 sx={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   width: '100%', cursor: 'pointer', userSelect: 'none',
@@ -205,6 +198,7 @@ export default function BackgroundWatermarkPanel({
                   color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
                   transition: 'background-color 0.2s',
                   '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
+                  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
                 }}
               >
                 Upload Image From Device
@@ -298,6 +292,7 @@ export default function BackgroundWatermarkPanel({
                   <Box
                     component="label"
                     htmlFor={wmInputId}
+                    tabIndex={0}
                     sx={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       width: '100%', cursor: 'pointer', userSelect: 'none',
@@ -307,6 +302,7 @@ export default function BackgroundWatermarkPanel({
                       color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
                       transition: 'background-color 0.2s',
                       '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
+                      '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
                     }}
                   >
                     Upload Image From Device
