@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -13,6 +14,8 @@ interface CsvUploadProps {
 }
 
 export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: CsvUploadProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -50,22 +53,23 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
         </Box>
       )}
       {/*
-        MUI ButtonBase adds role="button" to any non-button component, which overrides
-        the native label semantics and breaks the label→input association. Wrapping a
-        plain HTML <label> around a Button component="span" avoids this — the outer
-        <label> is not touched by ButtonBase so the browser honours its native behaviour.
+        Use a real <button> onClick → ref.click() so the file dialog open is a direct
+        synchronous user-gesture call. The label/component="label" patterns both fail in
+        Chrome: MUI adds role="button" to non-button components, which causes the browser
+        to treat the inner span as an interactive widget that consumes the click, preventing
+        the label from triggering the file input. Using position:absolute/opacity:0 instead
+        of display:none ensures Chrome treats the programmatic .click() as a trusted gesture.
       */}
-      <label style={{ display: 'inline-block' }}>
-        <Button variant="contained" component="span" tabIndex={-1}>
-          Upload CSV
-        </Button>
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          onChange={handleFileChange}
-          style={{ display: 'none' }}
-        />
-      </label>
+      <Button variant="contained" onClick={() => inputRef.current?.click()}>
+        Upload CSV
+      </Button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,text/csv"
+        onChange={handleFileChange}
+        style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+      />
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
         First row should be column headers.
       </Typography>
