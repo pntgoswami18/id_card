@@ -49,17 +49,23 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
           </Box>
         </Box>
       )}
-      {/* Use component="label" so the browser natively triggers the file dialog —
-          no JavaScript ref.click() needed, works reliably across all browsers. */}
-      <Button variant="contained" component="label">
-        Upload CSV
+      {/*
+        MUI ButtonBase adds role="button" to any non-button component, which overrides
+        the native label semantics and breaks the label→input association. Wrapping a
+        plain HTML <label> around a Button component="span" avoids this — the outer
+        <label> is not touched by ButtonBase so the browser honours its native behaviour.
+      */}
+      <label style={{ display: 'inline-block' }}>
+        <Button variant="contained" component="span" tabIndex={-1}>
+          Upload CSV
+        </Button>
         <input
           type="file"
           accept=".csv,text/csv"
           onChange={handleFileChange}
           style={{ display: 'none' }}
         />
-      </Button>
+      </label>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
         First row should be column headers.
       </Typography>
