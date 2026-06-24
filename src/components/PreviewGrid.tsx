@@ -18,8 +18,6 @@ interface PreviewGridProps {
   onCardClick: (index: number) => void;
   /** Actual global indices for each record (used when displaying a filtered subset). */
   recordGlobalIndices?: number[];
-  /** Fallback: global index of first record in this page (for pagination without filtering). */
-  recordsOffset?: number;
 }
 
 export default function PreviewGrid({
@@ -30,7 +28,6 @@ export default function PreviewGrid({
   onToggleSelect,
   onCardClick,
   recordGlobalIndices,
-  recordsOffset = 0,
 }: PreviewGridProps) {
   const wMm = printSettings.orientation === 'portrait' ? printSettings.heightMm : printSettings.widthMm;
   const hMm = printSettings.orientation === 'portrait' ? printSettings.widthMm : printSettings.heightMm;
@@ -55,7 +52,7 @@ export default function PreviewGrid({
       }}
     >
       {records.map((record, i) => {
-        const globalIndex = recordGlobalIndices ? recordGlobalIndices[i] : recordsOffset + i;
+        const globalIndex = recordGlobalIndices?.[i] ?? i;
         return (
         <Card
           key={record.id}

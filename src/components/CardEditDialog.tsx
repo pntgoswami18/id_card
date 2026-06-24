@@ -176,7 +176,7 @@ export default function CardEditDialog({
                     onChange={(e) => handleFontSizeChange(binding, e.target.value)}
                     placeholder="Auto"
                     type="number"
-                    inputProps={{ min: 4, max: 144, step: 1 }}
+                    inputProps={{ min: 4, max: 144, step: 1, onWheel: (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur() }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">pt</InputAdornment>,
                     }}

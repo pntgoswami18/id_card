@@ -23,7 +23,10 @@ type Rect = { left: number; top: number; width: number; height: number };
 type MarqueeState = { startX: number; startY: number; currentX: number; currentY: number; rect: Rect };
 
 const isSafeImageSrc = (v: string | null | undefined): v is string =>
-  !!v && (v.startsWith('data:image/') || /^https?:\/\//i.test(v));
+  !!v && (
+    (v.startsWith('data:image/') && !v.startsWith('data:image/svg')) ||
+    /^https?:\/\//i.test(v)
+  );
 
 function getFieldValue(record: CardRecord | null | undefined, binding: string | undefined): string | null {
   if (!binding || !record) return null;

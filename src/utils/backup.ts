@@ -73,9 +73,16 @@ export function restoreFromBackup(backup: BackupData): RestoreResult {
 
     const { workspaceList, workspaceData, userTemplates, printPresets } = backup;
 
+    const knownIds = new Set(workspaceList.workspaces.map((w) => w.id));
+
+    if (workspaceList.currentId && !knownIds.has(workspaceList.currentId)) {
+      workspaceList.currentId = workspaceList.workspaces.length > 0 ? workspaceList.workspaces[0].id : '';
+    }
+
     localStorage.setItem(LIST_KEY, JSON.stringify(workspaceList));
 
     for (const [id, data] of Object.entries(workspaceData)) {
+      if (!knownIds.has(id)) continue; // skip unrecognized keys
       if (data && typeof data === 'object' && data.template && Array.isArray(data.records)) {
         localStorage.setItem(DATA_PREFIX + id, JSON.stringify(data));
       }

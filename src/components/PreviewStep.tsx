@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -12,6 +12,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
+import { alpha } from '@mui/material/styles';
 import { useAppState, useAppDispatch } from '../store/AppStateContext';
 import PreviewGrid from './PreviewGrid';
 import CardEditDialog from './CardEditDialog';
@@ -31,6 +32,8 @@ export default function PreviewStep() {
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(24);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const bindings = useMemo(
     () => template.elements
@@ -47,7 +50,7 @@ export default function PreviewStep() {
   // Filter records by search query across all text fields (data + overrides)
   const filteredResults = useMemo(() => {
     const all = records.map((record, globalIndex) => ({ record, globalIndex }));
-    const q = searchQuery.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     if (!q) return all;
     return all.filter(({ record }) =>
       textBindings.some((binding) => {
@@ -55,9 +58,9 @@ export default function PreviewStep() {
         return (val ?? '').toLowerCase().includes(q);
       })
     );
-  }, [records, searchQuery, textBindings]);
+  }, [records, debouncedQuery, textBindings]);
 
-  const isSearchActive = searchQuery.trim().length > 0;
+  const isSearchActive = filteredResults.length < records.length;
 
   const pageCount = Math.max(1, Math.ceil(filteredResults.length / rowsPerPage));
 
@@ -70,13 +73,21 @@ export default function PreviewStep() {
     setPage(1);
   }, [searchQuery]);
 
+  // Debounce search query by 150ms for filteredResults computation
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 150);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const paginatedItems = useMemo(() => {
     const start = (page - 1) * rowsPerPage;
     return filteredResults.slice(start, start + rowsPerPage);
   }, [filteredResults, page, rowsPerPage]);
 
-  const paginatedRecords = useMemo(() => paginatedItems.map((item) => item.record), [paginatedItems]);
-  const paginatedGlobalIndices = useMemo(() => paginatedItems.map((item) => item.globalIndex), [paginatedItems]);
+  const { paginatedRecords, paginatedGlobalIndices } = useMemo(() => ({
+    paginatedRecords: paginatedItems.map((item) => item.record),
+    paginatedGlobalIndices: paginatedItems.map((item) => item.globalIndex),
+  }), [paginatedItems]);
 
   const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
@@ -155,6 +166,8 @@ export default function PreviewStep() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             sx={{ mb: 2, maxWidth: 360 }}
+            inputRef={searchInputRef}
+            inputProps={{ 'aria-label': 'Search cards' }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -163,7 +176,15 @@ export default function PreviewStep() {
               ),
               endAdornment: searchQuery ? (
                 <InputAdornment position="end">
-                  <IconButton size="small" edge="end" onClick={() => setSearchQuery('')} aria-label="Clear search">
+                  <IconButton
+                    size="small"
+                    edge="end"
+                    aria-label="Clear search"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setTimeout(() => searchInputRef.current?.focus(), 0);
+                    }}
+                  >
                     <CloseIcon fontSize="small" />
                   </IconButton>
                 </InputAdornment>
@@ -182,18 +203,27 @@ export default function PreviewStep() {
                 px: 1.5,
                 py: 0.75,
                 borderRadius: 1,
-                bgcolor: filteredResults.length > 0 ? 'primary.50' : 'warning.50',
+                bgcolor: filteredResults.length > 0
+                  ? (theme) => alpha(theme.palette.primary.main, 0.08)
+                  : (theme) => alpha(theme.palette.warning.main, 0.1),
                 border: '1px solid',
-                borderColor: filteredResults.length > 0 ? 'primary.200' : 'warning.200',
+                borderColor: filteredResults.length > 0 ? 'primary.main' : 'warning.main',
               }}
             >
               <SearchIcon fontSize="small" sx={{ color: filteredResults.length > 0 ? 'primary.main' : 'warning.main' }} />
               <Typography variant="body2" sx={{ flex: 1, color: filteredResults.length > 0 ? 'primary.dark' : 'warning.dark' }}>
                 {filteredResults.length === 0
-                  ? `No cards match "${searchQuery}"`
-                  : `Showing ${filteredResults.length} of ${records.length} card${records.length !== 1 ? 's' : ''} matching "${searchQuery}"`}
+                  ? `No cards match "${debouncedQuery}" — try a different search or clear to see all cards`
+                  : `Showing ${filteredResults.length} of ${records.length} card${records.length !== 1 ? 's' : ''} matching "${debouncedQuery}"`}
               </Typography>
-              <Button size="small" onClick={() => setSearchQuery('')} sx={{ whiteSpace: 'nowrap', minWidth: 0 }}>
+              <Button
+                size="small"
+                sx={{ whiteSpace: 'nowrap', minWidth: 0 }}
+                onClick={() => {
+                  setSearchQuery('');
+                  setTimeout(() => searchInputRef.current?.focus(), 0);
+                }}
+              >
                 Clear
               </Button>
             </Box>
