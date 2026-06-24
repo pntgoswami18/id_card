@@ -49,12 +49,21 @@ function clamp(v: number, lo: number, hi: number) {
 
 export default function ImageCropDialog({ open, imageSrc, onClose, onCrop }: ImageCropDialogProps) {
   const imgRef = useRef<HTMLImageElement>(null);
+  const usePhotoRef = useRef<HTMLButtonElement>(null);
   const [rect, setRect] = useState<CropRect>({ left: 0, top: 0, right: 100, bottom: 100 });
   const dragRef = useRef<DragState | null>(null);
 
   useEffect(() => {
     if (open) setRect({ left: 0, top: 0, right: 100, bottom: 100 });
   }, [open, imageSrc]);
+
+  // MUI Dialog's focus trap takes priority over the autoFocus prop; focus the
+  // button explicitly after the dialog's own focus management has settled.
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => usePhotoRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
+  }, [open]);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, mode: 'move' | Handle) => {
@@ -196,7 +205,7 @@ export default function ImageCropDialog({ open, imageSrc, onClose, onCrop }: Ima
           Reset
         </Button>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={handleCrop} autoFocus>
+        <Button ref={usePhotoRef} variant="contained" onClick={handleCrop}>
           Use Photo
         </Button>
       </DialogActions>
