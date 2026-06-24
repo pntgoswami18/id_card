@@ -22,6 +22,9 @@ interface CardCanvasProps {
 type Rect = { left: number; top: number; width: number; height: number };
 type MarqueeState = { startX: number; startY: number; currentX: number; currentY: number; rect: Rect };
 
+const isSafeImageSrc = (v: string | null | undefined): v is string =>
+  !!v && (v.startsWith('data:image/') || /^https?:\/\//i.test(v));
+
 function getFieldValue(record: CardRecord | null | undefined, binding: string | undefined): string | null {
   if (!binding || !record) return null;
   const overridden = record.overrides[binding];
@@ -770,7 +773,7 @@ export default function CardCanvas({
           </span>
         )
       ) : el.type === 'image' ? (
-        getFieldValue(record, el.binding) ? (
+        isSafeImageSrc(getFieldValue(record, el.binding)) ? (
           <img src={getFieldValue(record, el.binding)!} alt="" style={{ width: '100%', height: '100%', objectFit: el.objectFit ?? 'cover', pointerEvents: 'none' }} />
         ) : (
           <div

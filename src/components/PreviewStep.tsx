@@ -46,9 +46,12 @@ export default function PreviewStep() {
     setPage(1);
   };
 
-  const bindings = template.elements
-    .filter((e) => e.binding)
-    .map((e) => ({ elementId: e.id, binding: e.binding!, isImage: e.type === 'image' }));
+  const bindings = useMemo(
+    () => template.elements
+      .filter((e) => e.binding)
+      .map((e) => ({ elementId: e.id, binding: e.binding!, isImage: e.type === 'image' })),
+    [template.elements]
+  );
 
   const imageBinding =
     template.elements.find((e) => e.type === 'image' && e.binding)?.binding ?? 'photo';
@@ -59,7 +62,7 @@ export default function PreviewStep() {
     setEditIndex(index);
   };
 
-  const handleSaveOverrides = (overrides: Record<string, string | null>, fontSizeOverrides: Record<string, number>) => {
+  const handleSaveOverrides = (overrides: Record<string, string | null>, fontSizeOverrides: Record<string, number | null>) => {
     if (editIndex == null) return;
     dispatch({ type: 'UPDATE_RECORD_OVERRIDES', payload: { index: editIndex, overrides, fontSizeOverrides } });
   };

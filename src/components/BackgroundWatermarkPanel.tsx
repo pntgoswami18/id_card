@@ -343,9 +343,10 @@ export default function BackgroundWatermarkPanel({
                 label="Rotation (degrees)"
                 type="number"
                 value={watermark.rotation ?? 0}
-                onChange={(e) =>
-                  onWatermarkChange({ ...watermark, rotation: parseInt(e.target.value, 10) || 0 })
-                }
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10);
+                  onWatermarkChange({ ...watermark, rotation: Number.isNaN(n) ? 0 : n });
+                }}
                 sx={{ mt: 1 }}
                 inputProps={{ min: -180, max: 180 }}
               />
@@ -357,9 +358,10 @@ export default function BackgroundWatermarkPanel({
                   label="Font size"
                   type="number"
                   value={watermark.fontSize ?? 14}
-                  onChange={(e) =>
-                    onWatermarkChange({ ...watermark, fontSize: parseInt(e.target.value, 10) || 14 })
-                  }
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    onWatermarkChange({ ...watermark, fontSize: Number.isNaN(n) ? 14 : n });
+                  }}
                   sx={{ mt: 1 }}
                   inputProps={{ min: 8, max: 72 }}
                 />

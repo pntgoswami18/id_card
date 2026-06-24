@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, Component, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, Component, type ReactNode } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -123,7 +123,7 @@ function AppContent() {
     autoSaveToFile,
   ]);
 
-  const currentWorkspaceData: WorkspaceData = {
+  const currentWorkspaceData = useMemo<WorkspaceData>(() => ({
     template,
     records,
     columnMapping,
@@ -133,14 +133,38 @@ function AppContent() {
     currentTemplateSource,
     logo: currentWorkspaceLogo,
     csvData,
-  };
+  }), [template, records, columnMapping, printPresets, printSettings, selectedCardIndices, currentTemplateSource, currentWorkspaceLogo, csvData]);
 
-  const stepContent = [
+  const stepContent = useMemo(() => [
     <DesignStep key="design" />,
     <DataStep key="data" />,
     <PreviewStep key="preview" />,
     <PrintStep key="print" />,
-  ];
+  ], []);
+
+  const handleSaveCurrent = useCallback((overrides?: Partial<WorkspaceData>) => {
+    if (currentWorkspaceId) {
+      const toSave = overrides ? { ...currentWorkspaceData, ...overrides } : currentWorkspaceData;
+      saveWorkspaceData(currentWorkspaceId, { ...toSave, csvData: null });
+    }
+  }, [currentWorkspaceId, currentWorkspaceData]);
+
+  const handleLoadWorkspace = useCallback((data: WorkspaceData) => {
+    skipAutoSaveRef.current = true;
+    dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: data });
+  }, [dispatch]);
+
+  const handleSetCurrentWorkspace = useCallback((id: string) => {
+    dispatch({ type: 'SET_CURRENT_WORKSPACE', payload: id });
+  }, [dispatch]);
+
+  const handleSetWorkspaceList = useCallback((list: WorkspaceMeta[]) => {
+    dispatch({ type: 'SET_WORKSPACE_LIST', payload: list });
+  }, [dispatch]);
+
+  const handleSetWorkspaceLogo = useCallback((logo: string | undefined) => {
+    dispatch({ type: 'SET_WORKSPACE_LOGO', payload: logo });
+  }, [dispatch]);
 
   return (
     <Box
@@ -177,19 +201,11 @@ function AppContent() {
             autoSaveToFile={autoSaveToFile}
             onAutoSaveToFileChange={(v) => { setAutoSaveToFile(v); setAutoSavePref(v); }}
             fileHandleRef={fileHandleRef}
-            onSaveCurrent={(overrides?: Partial<WorkspaceData>) => {
-              if (currentWorkspaceId) {
-                const toSave = overrides ? { ...currentWorkspaceData, ...overrides } : currentWorkspaceData;
-                saveWorkspaceData(currentWorkspaceId, { ...toSave, csvData: null });
-              }
-            }}
-            onLoadWorkspace={(data: WorkspaceData) => {
-              skipAutoSaveRef.current = true;
-              dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: data });
-            }}
-            onSetCurrentWorkspace={(id: string) => dispatch({ type: 'SET_CURRENT_WORKSPACE', payload: id })}
-            onSetWorkspaceList={(list: WorkspaceMeta[]) => dispatch({ type: 'SET_WORKSPACE_LIST', payload: list })}
-            onSetWorkspaceLogo={(logo: string | undefined) => dispatch({ type: 'SET_WORKSPACE_LOGO', payload: logo })}
+            onSaveCurrent={handleSaveCurrent}
+            onLoadWorkspace={handleLoadWorkspace}
+            onSetCurrentWorkspace={handleSetCurrentWorkspace}
+            onSetWorkspaceList={handleSetWorkspaceList}
+            onSetWorkspaceLogo={handleSetWorkspaceLogo}
           />
         </Box>
         <Stepper

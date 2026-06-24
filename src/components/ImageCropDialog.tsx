@@ -97,13 +97,14 @@ export default function ImageCropDialog({ open, imageSrc, onClose, onCrop }: Ima
   const handleMouseUp = useCallback(() => { dragRef.current = null; }, []);
 
   useEffect(() => {
+    if (!open || !imageSrc) return;
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [handleMouseMove, handleMouseUp]);
+  }, [open, imageSrc, handleMouseMove, handleMouseUp]);
 
   const handleCrop = () => {
     const img = imgRef.current;

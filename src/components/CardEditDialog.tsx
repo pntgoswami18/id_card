@@ -21,7 +21,7 @@ interface CardEditDialogProps {
   onClose: () => void;
   record: CardRecord | null;
   bindings: BindingDef[];
-  onSave: (overrides: Record<string, string | null>, fontSizeOverrides: Record<string, number>) => void;
+  onSave: (overrides: Record<string, string | null>, fontSizeOverrides: Record<string, number | null>) => void;
   onTakePhoto: () => void;
   onPhotoReady: (dataUrl: string, name: string) => void;
   photoDisplayNames: Record<string, string>;
@@ -66,6 +66,9 @@ export default function CardEditDialog({
       const result = ev.target?.result;
       if (typeof result === 'string') onPhotoReady(result, fileName);
     };
+    reader.onerror = () => {
+      alert('Failed to read the image file. Please try again.');
+    };
     reader.readAsDataURL(file);
   };
 
@@ -98,11 +101,10 @@ export default function CardEditDialog({
 
   const handleSave = () => {
     const overrides: Record<string, string | null> = {};
-    const fontSizeOverrides: Record<string, number> = {};
+    const fontSizeOverrides: Record<string, number | null> = {};
     bindings.forEach(({ binding }) => {
       overrides[binding] = values[binding] || null;
-      const sz = fontSizes[binding];
-      if (sz != null) fontSizeOverrides[binding] = sz;
+      fontSizeOverrides[binding] = fontSizes[binding] ?? null;
     });
     onSave(overrides, fontSizeOverrides);
     onClose();
@@ -213,23 +215,14 @@ export default function CardEditDialog({
             <Button variant="outlined" fullWidth onClick={onTakePhoto}>
               Take Photo
             </Button>
-            <Box
+            <Button
               component="label"
               htmlFor={photoInputId}
-              tabIndex={0}
-              sx={{
-                flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', userSelect: 'none', px: 2, py: 0.75, borderRadius: 1,
-                fontSize: '0.875rem', fontWeight: 500, lineHeight: 1.75,
-                letterSpacing: '0.02857em', textTransform: 'uppercase',
-                color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
-                transition: 'background-color 0.2s',
-                '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
-                '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
-              }}
+              variant="outlined"
+              fullWidth
             >
               Upload Photo
-            </Box>
+            </Button>
           </Box>
         </Box>
       </DialogContent>
