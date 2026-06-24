@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -107,13 +107,18 @@ export default function PrintSettingsComponent({
   const margin    = settings.pageMarginMm  ?? 5;
   const gap       = settings.cardGapMm     ?? 0;
   const paperOrientation = settings.paperOrientation ?? 'auto';
-  const sizeId    = detectPaperSizeId(rawPaperW, rawPaperH);
+
+  // Local state so selecting "Custom" immediately reveals the input fields,
+  // even before the user has changed the dimension values.
+  const [sizeId, setSizeId] = useState(() => detectPaperSizeId(rawPaperW, rawPaperH));
 
   const handlePaperSizeSelect = (id: string) => {
+    setSizeId(id);
     const preset = PAPER_SIZES.find((p) => p.id === id);
     if (preset && preset.id !== 'custom') {
       onSettingsChange({ paperWidthMm: preset.width, paperHeightMm: preset.height });
     }
+    // For 'custom': keep the current dimensions as the starting point; user edits the fields below.
   };
 
   const handleSavePreset = () => {
