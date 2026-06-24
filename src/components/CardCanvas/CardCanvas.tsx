@@ -41,7 +41,8 @@ function renderBackground(background: BackgroundConfig | null | undefined, baseS
   if (background.type === 'solid') {
     base.backgroundColor = background.value;
   } else if (background.type === 'gradient') {
-    const dir = background.gradientDirection || 'to bottom';
+    const SAFE_DIRS = new Set(['to bottom', 'to top', 'to right', 'to left']);
+    const dir = SAFE_DIRS.has(background.gradientDirection ?? '') ? background.gradientDirection! : 'to bottom';
     const c2 = background.gradientColor2 || background.value;
     base.background = `linear-gradient(${dir}, ${background.value}, ${c2})`;
   } else if (background.type === 'image' && background.value) {
@@ -97,6 +98,7 @@ function renderWatermarkStatic(watermark: WatermarkConfig | null | undefined) {
       </div>
     );
   }
+  if (!isSafeImageSrc(watermark.value)) return null;
   return (
     <img
       src={watermark.value}
@@ -725,6 +727,7 @@ export default function CardCanvas({
   };
 
   const renderElement = (el: TemplateElement) => {
+    const imgSrc = el.type === 'image' ? getFieldValue(record, el.binding) : null;
     const isSelected = selectedElementIds.includes(el.id);
     const isSingleSelected = selectedElementIds.length === 1 && selectedElementIds[0] === el.id;
     const style: React.CSSProperties = {
@@ -776,8 +779,8 @@ export default function CardCanvas({
           </span>
         )
       ) : el.type === 'image' ? (
-        isSafeImageSrc(getFieldValue(record, el.binding)) ? (
-          <img src={getFieldValue(record, el.binding)!} alt="" style={{ width: '100%', height: '100%', objectFit: el.objectFit ?? 'cover', pointerEvents: 'none' }} />
+        isSafeImageSrc(imgSrc) ? (
+          <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: el.objectFit ?? 'cover', pointerEvents: 'none' }} />
         ) : (
           <div
             style={{

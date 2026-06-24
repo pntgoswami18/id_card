@@ -390,6 +390,7 @@ export default function WorkspaceSwitcher({
     onSaveCurrent();
 
     let targetParentId = currentMeta.parentId;
+    let createdNewParentId: string | null = null;
 
     try {
     if (dupSubLocation === 'different') {
@@ -406,6 +407,7 @@ export default function WorkspaceSwitcher({
       list.workspaces = [...list.workspaces, newParentMeta];
       saveWorkspaceList(list);
       saveWorkspaceData(newParentId, getDefaultWorkspaceData());
+      createdNewParentId = newParentId;
       targetParentId = newParentId;
     }
 
@@ -422,6 +424,12 @@ export default function WorkspaceSwitcher({
     setDupSubTargetParentId('');
     setDupSubNewParentName('');
     } catch (err) {
+      // Roll back the new parent workspace if it was written but the duplicate failed.
+      if (createdNewParentId) {
+        const list = getWorkspaceList();
+        list.workspaces = list.workspaces.filter((w) => w.id !== createdNewParentId);
+        saveWorkspaceList(list);
+      }
       console.error('Duplicate sub-workspace failed:', err);
       alert(`Could not duplicate: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
