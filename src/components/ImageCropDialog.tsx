@@ -195,7 +195,7 @@ export default function ImageCropDialog({ open, imageSrc, onClose, onCrop }: Ima
           Reset
         </Button>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={handleCrop}>
+        <Button variant="contained" onClick={handleCrop} autoFocus>
           Use Photo
         </Button>
       </DialogActions>
