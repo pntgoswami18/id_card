@@ -101,6 +101,8 @@ export interface CardRecord {
   id: string;
   data: RecordData;
   overrides: CardOverrides;
+  /** Per-field font-size overrides (pt). When set, bypasses auto-fit for that field. */
+  fontSizeOverrides?: Record<string, number>;
 }
 
 // Column mapping: template binding key -> CSV column name

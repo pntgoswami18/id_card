@@ -59,9 +59,9 @@ export default function PreviewStep() {
     setEditIndex(index);
   };
 
-  const handleSaveOverrides = (overrides: Record<string, string | null>) => {
+  const handleSaveOverrides = (overrides: Record<string, string | null>, fontSizeOverrides: Record<string, number>) => {
     if (editIndex == null) return;
-    dispatch({ type: 'UPDATE_RECORD_OVERRIDES', payload: { index: editIndex, overrides } });
+    dispatch({ type: 'UPDATE_RECORD_OVERRIDES', payload: { index: editIndex, overrides, fontSizeOverrides } });
   };
 
   const handleTakePhotoFromDialog = () => {

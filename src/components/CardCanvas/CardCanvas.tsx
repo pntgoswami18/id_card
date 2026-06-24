@@ -740,9 +740,10 @@ export default function CardCanvas({
           ? (el.placeholder || '\u00A0')
           : (getFieldValue(record, el.binding) ?? el.placeholder ?? '\u00A0');
     const textOrLabelEl = el.type === 'text' ? (el as TextElement) : (el as LabelElement);
+    const fontSizeOverride = el.binding ? record?.fontSizeOverrides?.[el.binding] : undefined;
     const content =
       el.type === 'text' || el.type === 'label' ? (
-        textOrLabelEl.fontSizeAuto !== false ? (
+        textOrLabelEl.fontSizeAuto !== false && fontSizeOverride == null ? (
           <FitText
             text={typeof textContent === 'string' ? textContent : '\u00A0'}
             fontWeight={textOrLabelEl.fontWeight ?? 'normal'}
@@ -756,7 +757,7 @@ export default function CardCanvas({
         ) : (
           <span
             style={{
-              fontSize: textOrLabelEl.fontSize ?? 12,
+              fontSize: fontSizeOverride ?? textOrLabelEl.fontSize ?? 12,
               fontWeight: textOrLabelEl.fontWeight ?? 'normal',
               color: textOrLabelEl.color ?? '#000',
               ...(textOrLabelEl.fontFamily && { fontFamily: textOrLabelEl.fontFamily }),

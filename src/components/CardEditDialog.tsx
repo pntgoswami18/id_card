@@ -7,14 +7,21 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import InputAdornment from '@mui/material/InputAdornment';
 import type { CardRecord } from '../types';
+
+interface BindingDef {
+  elementId: string;
+  binding: string;
+  isImage?: boolean;
+}
 
 interface CardEditDialogProps {
   open: boolean;
   onClose: () => void;
   record: CardRecord | null;
-  bindings: { elementId: string; binding: string; isImage?: boolean }[];
-  onSave: (overrides: Record<string, string | null>) => void;
+  bindings: BindingDef[];
+  onSave: (overrides: Record<string, string | null>, fontSizeOverrides: Record<string, number>) => void;
   onTakePhoto: () => void;
   onPhotoReady: (dataUrl: string, name: string) => void;
   photoDisplayNames: Record<string, string>;
@@ -37,6 +44,8 @@ export default function CardEditDialog({
   photoDisplayNames,
 }: CardEditDialogProps) {
   const [values, setValues] = useState<Record<string, string>>({});
+  // null = no override (auto-fit); number = fixed size in pt
+  const [fontSizes, setFontSizes] = useState<Record<string, number | null>>({});
   const photoInputId = useId();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,28 +71,47 @@ export default function CardEditDialog({
 
   useEffect(() => {
     if (!record) return;
-    const next: Record<string, string> = {};
+    const nextValues: Record<string, string> = {};
+    const nextSizes: Record<string, number | null> = {};
     bindings.forEach(({ binding }) => {
-      next[binding] = getValue(record, binding);
+      nextValues[binding] = getValue(record, binding);
+      nextSizes[binding] = record.fontSizeOverrides?.[binding] ?? null;
     });
-    setValues(next);
+    setValues(nextValues);
+    setFontSizes(nextSizes);
   }, [record, bindings, open]);
 
   const handleChange = (binding: string, value: string) => {
     setValues((prev) => ({ ...prev, [binding]: value }));
   };
 
+  const handleFontSizeChange = (binding: string, raw: string) => {
+    if (raw === '') {
+      setFontSizes((prev) => ({ ...prev, [binding]: null }));
+      return;
+    }
+    const n = parseInt(raw, 10);
+    if (!Number.isNaN(n) && n >= 4 && n <= 144) {
+      setFontSizes((prev) => ({ ...prev, [binding]: n }));
+    }
+  };
+
   const handleSave = () => {
     const overrides: Record<string, string | null> = {};
+    const fontSizeOverrides: Record<string, number> = {};
     bindings.forEach(({ binding }) => {
-      const v = values[binding] ?? '';
-      overrides[binding] = v || null;
+      overrides[binding] = values[binding] || null;
+      const sz = fontSizes[binding];
+      if (sz != null) fontSizeOverrides[binding] = sz;
     });
-    onSave(overrides);
+    onSave(overrides, fontSizeOverrides);
     onClose();
   };
 
   if (!record) return null;
+
+  const textBindings = bindings.filter((b) => !b.isImage);
+  const hasTextBindings = textBindings.length > 0;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -127,17 +155,53 @@ export default function CardEditDialog({
                 </Box>
               );
             }
+
+            const sizeVal = fontSizes[binding];
             return (
-              <TextField
-                key={binding}
-                fullWidth
-                size="small"
-                label={binding}
-                value={value}
-                onChange={(e) => handleChange(binding, e.target.value)}
-              />
+              <Box key={binding} sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label={binding}
+                    value={value}
+                    onChange={(e) => handleChange(binding, e.target.value)}
+                  />
+                  <TextField
+                    size="small"
+                    label="Size"
+                    value={sizeVal ?? ''}
+                    onChange={(e) => handleFontSizeChange(binding, e.target.value)}
+                    placeholder="Auto"
+                    type="number"
+                    inputProps={{ min: 4, max: 144, step: 1 }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">pt</InputAdornment>,
+                    }}
+                    sx={{ width: 110, flexShrink: 0 }}
+                    title="Leave empty to auto-fit text"
+                  />
+                </Box>
+                {sizeVal != null && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ cursor: 'pointer', alignSelf: 'flex-end', '&:hover': { color: 'primary.main' } }}
+                    onClick={() => setFontSizes((prev) => ({ ...prev, [binding]: null }))}
+                  >
+                    Reset to auto-fit
+                  </Typography>
+                )}
+              </Box>
             );
           })}
+
+          {hasTextBindings && (
+            <Typography variant="caption" color="text.secondary">
+              Font size — leave empty to auto-fit text to its box; enter a value to fix the size.
+            </Typography>
+          )}
+
           <input
             id={photoInputId}
             type="file"

@@ -39,7 +39,7 @@ export type AppAction =
   | { type: 'UPDATE_TEMPLATE_BACKGROUND'; payload: BackgroundConfig | null }
   | { type: 'UPDATE_TEMPLATE_WATERMARK'; payload: WatermarkConfig | null }
   | { type: 'SET_RECORDS'; payload: CardRecord[] }
-  | { type: 'UPDATE_RECORD_OVERRIDES'; payload: { index: number; overrides: CardRecord['overrides'] } }
+  | { type: 'UPDATE_RECORD_OVERRIDES'; payload: { index: number; overrides: CardRecord['overrides']; fontSizeOverrides?: CardRecord['fontSizeOverrides'] } }
   | { type: 'SET_COLUMN_MAPPING'; payload: ColumnMapping }
   | { type: 'SET_PRINT_PRESETS'; payload: PrintPreset[] }
   | { type: 'SET_PRINT_SETTINGS'; payload: Partial<PrintSettings> }
@@ -125,10 +125,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...(action.payload.length === 0 && { csvData: null }),
       };
     case 'UPDATE_RECORD_OVERRIDES': {
-      const { index, overrides } = action.payload;
+      const { index, overrides, fontSizeOverrides } = action.payload;
       const records = [...state.records];
       if (records[index]) {
-        records[index] = { ...records[index], overrides: { ...records[index].overrides, ...overrides } };
+        const prev = records[index];
+        const mergedFontSizes = fontSizeOverrides !== undefined
+          ? { ...(prev.fontSizeOverrides ?? {}), ...fontSizeOverrides }
+          : prev.fontSizeOverrides;
+        records[index] = {
+          ...prev,
+          overrides: { ...prev.overrides, ...overrides },
+          ...(mergedFontSizes !== undefined && { fontSizeOverrides: mergedFontSizes }),
+        };
       }
       return { ...state, records };
     }
