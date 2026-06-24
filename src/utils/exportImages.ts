@@ -1,0 +1,177 @@
+import { createRoot } from 'react-dom/client';
+import { createElement } from 'react';
+import JSZip from 'jszip';
+import html2canvas from 'html2canvas';
+import CardCanvas from '../components/CardCanvas/CardCanvas';
+import type { Template, CardRecord } from '../types';
+
+export type ExportFormat = 'png' | 'jpeg';
+
+export interface ExportOptions {
+  format: ExportFormat;
+  /** Pixel width to render each card at before html2canvas scaling. */
+  renderWidthPx?: number;
+  /** html2canvas pixel ratio — higher = sharper output. Default 3. */
+  scale?: number;
+  onProgress?: (done: number, total: number) => void;
+}
+
+async function waitForContainerReady(container: HTMLElement): Promise<void> {
+  await document.fonts.ready;
+  const imgs = Array.from(container.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map((img) =>
+      img.complete
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            img.addEventListener('load', () => resolve(), { once: true });
+            img.addEventListener('error', () => resolve(), { once: true });
+          }),
+    ),
+  );
+}
+
+/**
+ * Renders each card in `indices` off-screen, captures it with html2canvas,
+ * bundles all images into a ZIP, and triggers a browser download.
+ */
+export async function exportCardsAsImages(
+  template: Template,
+  records: CardRecord[],
+  indices: number[],
+  cardWidthMm: number,
+  cardHeightMm: number,
+  workspaceName: string,
+  options: ExportOptions,
+): Promise<void> {
+  const {
+    format,
+    renderWidthPx = 400,
+    scale = 3,
+    onProgress,
+  } = options;
+
+  const zip = new JSZip();
+  const ext = format === 'jpeg' ? 'jpg' : 'png';
+  const mimeType = `image/${format}`;
+  const quality = format === 'jpeg' ? 0.92 : undefined;
+  const errors: string[] = [];
+
+  // Create a single reusable container + root for all cards
+  const container = document.createElement('div');
+  container.style.cssText = `
+    position: fixed;
+    top: 0;
+    overflow: hidden;
+    background: white;
+  `;
+  const scalerDiv = document.createElement('div');
+  scalerDiv.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: ${cardWidthMm}mm;
+    height: ${cardHeightMm}mm;
+    transform-origin: top left;
+  `;
+  container.appendChild(scalerDiv);
+
+  let appended = false;
+  try {
+    document.body.appendChild(container);
+    appended = true;
+
+    // Measure actual rendered size (accounts for browser zoom and dpi).
+    // CSS transform scale() does not change layout dimensions, so we must
+    // measure naturalWidth before applying any transform.
+    const { width: naturalWidth, height: naturalHeight } = scalerDiv.getBoundingClientRect();
+    const actualScale = naturalWidth > 0 ? renderWidthPx / naturalWidth : 1;
+    const renderHeightPx = Math.round(naturalHeight * actualScale);
+
+    container.style.width = `${renderWidthPx}px`;
+    container.style.height = `${renderHeightPx}px`;
+    container.style.left = `-${renderWidthPx + 100}px`;
+    scalerDiv.style.transform = `scale(${actualScale})`;
+
+    const root = createRoot(scalerDiv);
+
+    try {
+      for (let i = 0; i < indices.length; i++) {
+        const recordIndex = indices[i];
+        const record = records[recordIndex];
+        if (!record) {
+          errors.push(`Card ${i + 1}: record not found (index ${recordIndex})`);
+          onProgress?.(i + 1, indices.length);
+          continue;
+        }
+
+        try {
+          root.render(
+            createElement(CardCanvas, {
+              template,
+              record,
+              widthMm: cardWidthMm,
+              heightMm: cardHeightMm,
+              designMode: false,
+            }),
+          );
+
+          // Wait for React to flush, then wait for fonts and images to load
+          await new Promise<void>((resolve) => setTimeout(resolve, 120));
+          await waitForContainerReady(container);
+
+          const canvas = await html2canvas(container, {
+            width: renderWidthPx,
+            height: renderHeightPx,
+            scale,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: '#ffffff',
+            logging: false,
+          });
+
+          const blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+              (b) => (b ? resolve(b) : reject(new Error('Canvas toBlob returned null'))),
+              mimeType,
+              quality,
+            );
+          });
+
+          const filename = `card-${String(i + 1).padStart(String(indices.length).length, '0')}.${ext}`;
+          zip.file(filename, blob);
+        } catch (err) {
+          errors.push(`Card ${i + 1}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        onProgress?.(i + 1, indices.length);
+      }
+    } finally {
+      root.unmount();
+    }
+  } finally {
+    if (appended) {
+      document.body.removeChild(container);
+    }
+  }
+
+  if (errors.length > 0 && errors.length === indices.length) {
+    throw new Error(`All cards failed to export:\n${errors.join('\n')}`);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+
+  const safeName = workspaceName
+    .replace(/[^a-z0-9_\-]/gi, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeName || 'cards'}-export.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Delay revocation so the browser has time to initiate the download
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

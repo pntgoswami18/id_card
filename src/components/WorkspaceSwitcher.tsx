@@ -75,7 +75,7 @@ interface WorkspaceSwitcherProps {
 export default function WorkspaceSwitcher({
   workspaceList,
   currentWorkspaceId,
-  currentWorkspaceData,
+  currentWorkspaceData: _currentWorkspaceData,
   currentWorkspaceLogo,
   autoSaveToFile,
   onAutoSaveToFileChange,
