@@ -7,6 +7,11 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Pagination from '@mui/material/Pagination';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
 import { useAppState, useAppDispatch } from '../store/AppStateContext';
 import PreviewGrid from './PreviewGrid';
 import CardEditDialog from './CardEditDialog';
@@ -25,17 +30,53 @@ export default function PreviewStep() {
   const [photoDisplayNames, setPhotoDisplayNames] = useState<Record<number, Record<string, string>>>({});
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(24);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const pageCount = Math.max(1, Math.ceil(records.length / rowsPerPage));
+  const bindings = useMemo(
+    () => template.elements
+      .filter((e) => e.binding)
+      .map((e) => ({ elementId: e.id, binding: e.binding!, isImage: e.type === 'image' })),
+    [template.elements]
+  );
+
+  const textBindings = useMemo(
+    () => bindings.filter((b) => !b.isImage).map((b) => b.binding),
+    [bindings]
+  );
+
+  // Filter records by search query across all text fields (data + overrides)
+  const filteredResults = useMemo(() => {
+    const all = records.map((record, globalIndex) => ({ record, globalIndex }));
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return all;
+    return all.filter(({ record }) =>
+      textBindings.some((binding) => {
+        const val = record.overrides[binding] ?? record.data[binding] ?? '';
+        return (val ?? '').toLowerCase().includes(q);
+      })
+    );
+  }, [records, searchQuery, textBindings]);
+
+  const isSearchActive = searchQuery.trim().length > 0;
+
+  const pageCount = Math.max(1, Math.ceil(filteredResults.length / rowsPerPage));
 
   useEffect(() => {
     if (page > pageCount) setPage(1);
   }, [page, pageCount]);
-  const paginatedRecords = useMemo(() => {
+
+  // Reset to page 1 whenever search query changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery]);
+
+  const paginatedItems = useMemo(() => {
     const start = (page - 1) * rowsPerPage;
-    return records.slice(start, start + rowsPerPage);
-  }, [records, page, rowsPerPage]);
-  const recordsOffset = (page - 1) * rowsPerPage;
+    return filteredResults.slice(start, start + rowsPerPage);
+  }, [filteredResults, page, rowsPerPage]);
+
+  const paginatedRecords = useMemo(() => paginatedItems.map((item) => item.record), [paginatedItems]);
+  const paginatedGlobalIndices = useMemo(() => paginatedItems.map((item) => item.globalIndex), [paginatedItems]);
 
   const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
@@ -45,13 +86,6 @@ export default function PreviewStep() {
     setRowsPerPage(e.target.value);
     setPage(1);
   };
-
-  const bindings = useMemo(
-    () => template.elements
-      .filter((e) => e.binding)
-      .map((e) => ({ elementId: e.id, binding: e.binding!, isImage: e.type === 'image' })),
-    [template.elements]
-  );
 
   const imageBinding =
     template.elements.find((e) => e.type === 'image' && e.binding)?.binding ?? 'photo';
@@ -114,13 +148,70 @@ export default function PreviewStep() {
         </Typography>
       ) : (
         <>
+          {/* Search bar */}
+          <TextField
+            size="small"
+            placeholder="Search cards…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ mb: 2, maxWidth: 360 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" edge="end" onClick={() => setSearchQuery('')} aria-label="Clear search">
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
+          />
+
+          {/* Search results banner */}
+          {isSearchActive && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                mb: 1.5,
+                px: 1.5,
+                py: 0.75,
+                borderRadius: 1,
+                bgcolor: filteredResults.length > 0 ? 'primary.50' : 'warning.50',
+                border: '1px solid',
+                borderColor: filteredResults.length > 0 ? 'primary.200' : 'warning.200',
+              }}
+            >
+              <SearchIcon fontSize="small" sx={{ color: filteredResults.length > 0 ? 'primary.main' : 'warning.main' }} />
+              <Typography variant="body2" sx={{ flex: 1, color: filteredResults.length > 0 ? 'primary.dark' : 'warning.dark' }}>
+                {filteredResults.length === 0
+                  ? `No cards match "${searchQuery}"`
+                  : `Showing ${filteredResults.length} of ${records.length} card${records.length !== 1 ? 's' : ''} matching "${searchQuery}"`}
+              </Typography>
+              <Button size="small" onClick={() => setSearchQuery('')} sx={{ whiteSpace: 'nowrap', minWidth: 0 }}>
+                Clear
+              </Button>
+            </Box>
+          )}
+
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2, alignItems: 'center' }}>
             <Button
               size="small"
               variant="outlined"
-              onClick={() => dispatch({ type: 'SELECT_ALL_CARDS' })}
+              onClick={() => {
+                if (isSearchActive) {
+                  dispatch({ type: 'SET_SELECTED_CARD_INDICES', payload: filteredResults.map((r) => r.globalIndex) });
+                } else {
+                  dispatch({ type: 'SELECT_ALL_CARDS' });
+                }
+              }}
             >
-              Select All
+              Select {isSearchActive ? 'Matching' : 'All'}
             </Button>
             <Button
               size="small"
@@ -141,16 +232,8 @@ export default function PreviewStep() {
             </Button>
           </Box>
 
-          {records.length > PAGE_SIZE_OPTIONS[0] && (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                mb: 2,
-                flexWrap: 'wrap',
-              }}
-            >
+          {filteredResults.length > PAGE_SIZE_OPTIONS[0] && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
               <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel>Cards per page</InputLabel>
                 <Select
@@ -163,15 +246,15 @@ export default function PreviewStep() {
                       {n}
                     </MenuItem>
                   ))}
-                  {records.length > Math.max(...PAGE_SIZE_OPTIONS) && (
-                    <MenuItem value={records.length}>
-                      All ({records.length})
+                  {filteredResults.length > Math.max(...PAGE_SIZE_OPTIONS) && (
+                    <MenuItem value={filteredResults.length}>
+                      All ({filteredResults.length})
                     </MenuItem>
                   )}
                 </Select>
               </FormControl>
               <Typography variant="body2" color="text.secondary">
-                Page {page} of {pageCount} ({records.length} total)
+                Page {page} of {pageCount} ({filteredResults.length} {isSearchActive ? 'matching' : 'total'})
               </Typography>
             </Box>
           )}
@@ -179,11 +262,11 @@ export default function PreviewStep() {
           <PreviewGrid
             template={template}
             records={paginatedRecords}
+            recordGlobalIndices={paginatedGlobalIndices}
             printSettings={printSettings}
             selectedIndices={selectedCardIndices}
             onToggleSelect={(i) => dispatch({ type: 'TOGGLE_CARD_SELECTION', payload: i })}
             onCardClick={handleCardClick}
-            recordsOffset={recordsOffset}
           />
 
           {pageCount > 1 && (
