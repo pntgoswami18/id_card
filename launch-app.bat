@@ -98,6 +98,20 @@ echo.
 :: 3. SYNC WITH MAIN BRANCH
 :: ======================================================
 echo [3/5] Checking for updates from main...
+:: Skip entirely if this folder is not a git repo
+if not exist ".git\" (
+    echo     Not a git repository. Skipping update check.
+    goto :after_update
+)
+:: Skip if no origin remote is configured
+git remote get-url origin >nul 2>&1
+if !ERRORLEVEL! neq 0 (
+    echo     No remote origin configured. Skipping update check.
+    goto :after_update
+)
+:: Disable any credential / passphrase prompts so fetch fails fast instead of hanging
+set "GIT_TERMINAL_PROMPT=0"
+set "GIT_ASKPASS=echo"
 git fetch origin main >nul 2>&1
 if !ERRORLEVEL! neq 0 (
     echo     WARNING: Could not reach remote. Continuing with current version.
@@ -121,6 +135,7 @@ if !ERRORLEVEL! neq 0 (
         echo     Already up to date.
     )
 )
+:after_update
 echo.
 
 :: ======================================================
