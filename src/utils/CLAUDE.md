@@ -25,7 +25,7 @@
 | `id-card-print-presets` | `PrintPreset[]` |
 | `id_card_autosave_to_file` | `'true'` / `'false'` — autosave-to-file preference (default: on) |
 
-`csvData` is intentionally stripped before any write to localStorage or `.idcard` files — it is in-memory only for the session. `duplicateWorkspace` also strips it.
+`csvData` is written to localStorage with each workspace save so column-mapping survives page reload. It is stripped from `.idcard` file exports (`buildFileContent` destructures it out) and from workspace duplicates (`duplicateWorkspace` strips it).
 
 `saveWorkspaceData` side-effects: if `data.logo` is set, it calls `updateWorkspaceMeta` to keep the list entry's logo in sync.
 
@@ -68,8 +68,8 @@ html2canvas ignores the `scale` parameter when rendering CSS `background-image` 
 
 ## Workspace hierarchy
 
-Sub-workspaces are max one level deep (enforced in `createSubWorkspace`). `WorkspaceMeta.parentId` marks children. Use `deleteWorkspaceTree(id)` to delete a root workspace and all its children atomically; `deleteWorkspace(id)` only deletes one entry and leaves orphaned children.
+Sub-workspaces are max one level deep (enforced in `createSubWorkspace`). `WorkspaceMeta.parentId` marks children. Always use `deleteWorkspaceTree(id)` to delete a workspace — it removes the entry and all its direct children atomically.
 
 ## getWorkspaceList — empty fallback on first launch
 
-`getWorkspaceList()` returns `{ currentId: '', workspaces: [] }` when `LIST_KEY` is absent from localStorage or when the stored list has no workspaces. It does **not** synthesise a ghost `{ id: 'default', name: 'Default' }` entry. All callers must handle an empty `workspaces` array. The app shows the first-launch setup modal when the list is empty; `deleteWorkspace`/`deleteWorkspaceTree` still write a `'default'` fallback when the last workspace is deleted (pre-existing behaviour, separate concern).
+`getWorkspaceList()` returns `{ currentId: '', workspaces: [] }` when `LIST_KEY` is absent from localStorage or when the stored list has no workspaces. It does **not** synthesise a ghost `{ id: 'default', name: 'Default' }` entry. All callers must handle an empty `workspaces` array. The app shows the first-launch setup modal when the list is empty; `deleteWorkspaceTree` still writes a `'default'` fallback when the last workspace is deleted (pre-existing behaviour, separate concern).

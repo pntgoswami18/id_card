@@ -95,7 +95,7 @@ function AppContent() {
       csvData,
     };
     const t = setTimeout(() => {
-      saveWorkspaceData(currentWorkspaceId, { ...data, csvData: null });
+      saveWorkspaceData(currentWorkspaceId, data);
       if (autoSaveToFile) {
         // Always autosave from the root so children are included in the file.
         const rootId = workspaceList.find((w) => w.id === currentWorkspaceId)?.parentId ?? currentWorkspaceId;
@@ -157,7 +157,7 @@ function AppContent() {
     if (!id) return;
     const base = currentWorkspaceDataRef.current!;
     const toSave = overrides ? { ...base, ...overrides } : base;
-    saveWorkspaceData(id, { ...toSave, csvData: null });
+    saveWorkspaceData(id, toSave);
   }, []);
 
   const handleLoadWorkspace = useCallback((data: WorkspaceData) => {

@@ -27,7 +27,7 @@ export interface AppState {
   workspaceList: WorkspaceMeta[];
   /** Logo (data URL or image URL) for the current workspace. */
   currentWorkspaceLogo?: string;
-  /** Parsed CSV kept in memory so the Data step survives navigation. Not persisted to localStorage. */
+  /** Parsed CSV for the Data step. Persisted to localStorage so column-mapping survives page reload. Stripped from .idcard file exports and workspace duplicates. */
   csvData: ParsedCsv | null;
 }
 

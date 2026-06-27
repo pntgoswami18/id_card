@@ -18,7 +18,7 @@ This layer is the single source of truth for all shared app state. It uses React
 | `currentWorkspaceId` | ID of the active workspace. |
 | `workspaceList` | `WorkspaceMeta[]` for the workspace switcher UI. |
 | `currentWorkspaceLogo` | Data URL or image URL for the workspace logo. Optional. |
-| `csvData` | Parsed CSV in memory for the Data step. **Not persisted.** See below. |
+| `csvData` | Parsed CSV for the Data step. Persisted to localStorage; stripped from `.idcard` exports and workspace duplicates. See below. |
 
 ## Actions
 
@@ -51,7 +51,7 @@ This layer is the single source of truth for all shared app state. It uses React
 - `SET_ACTIVE_STEP` — navigate steps directly (prefer this over side effects in components).
 - `SET_CURRENT_TEMPLATE_SOURCE` — update template source tracking after a template is loaded.
 - `SET_WATERMARK_EDIT_MODE` — toggle watermark canvas mode.
-- `SET_CSV_DATA` — store or clear the in-memory parsed CSV.
+- `SET_CSV_DATA` — store or clear the parsed CSV.
 
 ## useAppState and useAppDispatch
 
@@ -72,9 +72,9 @@ Restores a saved workspace in one dispatch. Each field is applied only if presen
 - Restores `csvData` from the payload if present (including `null` — treated as "no CSV yet"). If the key is absent from the payload, `csvData` is set to `null` (not kept from prior state).
 - Does **not** sync `currentTemplateSource` to `id-card-user-templates` or any storage key — it only sets what is explicitly in `WorkspaceData`. If the caller needs the source updated, dispatch `SET_CURRENT_TEMPLATE_SOURCE` separately after.
 
-## csvData: in-memory only
+## csvData persistence
 
-`csvData` is **never written to localStorage**. It lives only for the current session. Its sole purpose is keeping the Data step's column-mapping UI populated when the user navigates away and back within a session.
+`csvData` is written to localStorage as part of normal workspace auto-save, so column-mapping survives a page reload or workspace switch. It is **not** included in `.idcard` file exports (stripped by `buildFileContent`) or in workspace duplicates (stripped by `duplicateWorkspace`). Opening a `.idcard` file sets `csvData` to `null` because the key is absent from the file payload.
 
 `SET_RECORDS` with an empty payload clears `csvData` as a side effect (workspace load resets both). `SET_CSV_DATA` is the explicit setter.
 

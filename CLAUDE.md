@@ -35,7 +35,7 @@ No test suite exists yet.
 
 **FSA only works in Chrome/Edge.** `hasSaveFilePicker()` / `hasOpenFilePicker()` guard all FSA calls. Always provide the fallback path (hidden `<input type="file">` for open, `downloadWorkspaceFile` for save).
 
-**CSV data is not persisted to localStorage** (`csvData` in `AppState`) — it is in-memory only for the session.
+**CSV data is persisted to localStorage** (`csvData` in `AppState`) so column-mapping survives a page reload or workspace switch. It is stripped from `.idcard` file exports (`buildFileContent` destructures it out) and from workspace duplicates (`duplicateWorkspace` strips it). Opening a `.idcard` file clears csvData because it is absent from the file payload.
 
 ## Code style
 

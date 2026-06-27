@@ -98,19 +98,6 @@ export function createWorkspace(name: string, logo?: string): WorkspaceMeta {
   return meta;
 }
 
-export function deleteWorkspace(id: string): void {
-  const list = getWorkspaceList();
-  list.workspaces = list.workspaces.filter((w) => w.id !== id);
-  if (list.currentId === id && list.workspaces.length > 0) {
-    list.currentId = list.workspaces[0].id;
-  } else if (list.workspaces.length === 0) {
-    list.workspaces = [{ id: 'default', name: 'Default' }];
-    list.currentId = 'default';
-  }
-  saveWorkspaceList(list);
-  localStorage.removeItem(DATA_PREFIX + id);
-}
-
 export function renameWorkspace(id: string, name: string): void {
   const list = getWorkspaceList();
   const idx = list.workspaces.findIndex((w) => w.id === id);

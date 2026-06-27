@@ -33,6 +33,7 @@ import SubdirectoryArrowRight from '@mui/icons-material/SubdirectoryArrowRight';
 import CreateNewFolder from '@mui/icons-material/CreateNewFolder';
 import type { WorkspaceMeta, WorkspaceData } from '../utils/workspaceStorage';
 import {
+  DATA_PREFIX,
   getWorkspaceList,
   getWorkspaceData,
   createWorkspace,
@@ -42,7 +43,6 @@ import {
   deleteWorkspaceTree,
   renameWorkspace,
   updateWorkspaceMeta,
-  setCurrentWorkspace,
   getDefaultWorkspaceData,
   saveWorkspaceData,
   duplicateWorkspace,
@@ -189,8 +189,9 @@ export default function WorkspaceSwitcher({
   // ---- Switch ----
   const doSwitch = (id: string) => {
     onSaveCurrent();
-    setCurrentWorkspace(id);
     const list = getWorkspaceList();
+    list.currentId = id;
+    saveWorkspaceList(list);
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(id);
     const data = getWorkspaceData(id);
@@ -541,6 +542,7 @@ export default function WorkspaceSwitcher({
         const list = getWorkspaceList();
         list.workspaces = list.workspaces.filter((w) => w.id !== createdNewParentId);
         saveWorkspaceList(list);
+        localStorage.removeItem(DATA_PREFIX + createdNewParentId);
       }
       console.error('Duplicate sub-workspace failed:', err);
       alert(`Could not duplicate: ${err instanceof Error ? err.message : 'Unknown error'}`);
