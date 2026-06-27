@@ -37,6 +37,7 @@ function getValue(record: CardRecord | null, binding: string): string {
 }
 
 const MM_TO_PX = 3.7795275591;
+const PREVIEW_MAX_WIDTH = 420;
 
 export default function CardEditDialog({
   open,
@@ -58,9 +59,8 @@ export default function CardEditDialog({
   const hMm = printSettings.orientation === 'portrait' ? printSettings.widthMm : printSettings.heightMm;
   const canvasWidthPx = wMm * MM_TO_PX;
   const canvasHeightPx = hMm * MM_TO_PX;
-  // The dialog content area is ~880px wide at maxWidth="md". Use all of it.
-  const PREVIEW_CONTAINER_WIDTH = 880;
-  const scale = PREVIEW_CONTAINER_WIDTH / canvasWidthPx;
+  const previewWidth = Math.min(PREVIEW_MAX_WIDTH, canvasWidthPx);
+  const scale = previewWidth / canvasWidthPx;
   const previewHeight = canvasHeightPx * scale;
 
   const previewRecord = useMemo<CardRecord>(() => ({
@@ -139,42 +139,55 @@ export default function CardEditDialog({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Edit Card</DialogTitle>
-      <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
-        {/* Full-width live preview */}
-        <Box
-          sx={{
-            width: '100%',
-            height: previewHeight,
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.12)',
-            flexShrink: 0,
-            bgcolor: 'background.default',
-          }}
-        >
+      <DialogContent>
+        <Box sx={{ display: 'flex', gap: 3, pt: 1, alignItems: 'flex-start' }}>
+          {/* Live card preview */}
           <Box
             sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: canvasWidthPx,
-              height: canvasHeightPx,
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 1,
             }}
           >
-            <CardCanvas
-              template={template}
-              record={previewRecord}
-              widthMm={wMm}
-              heightMm={hMm}
-              designMode={false}
-            />
+            <Box
+              sx={{
+                width: previewWidth,
+                height: previewHeight,
+                position: 'relative',
+                overflow: 'hidden',
+                boxShadow: 3,
+                flexShrink: 0,
+              }}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: canvasWidthPx,
+                  height: canvasHeightPx,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                <CardCanvas
+                  template={template}
+                  record={previewRecord}
+                  widthMm={wMm}
+                  heightMm={hMm}
+                  designMode={false}
+                />
+              </Box>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              Live preview
+            </Typography>
           </Box>
-        </Box>
 
-        {/* Form fields */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0, p: 3 }}>
+          {/* Form fields */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
           {bindings.map(({ binding, isImage }) => {
             const value = values[binding] ?? '';
             if (isImage) {
@@ -273,6 +286,7 @@ export default function CardEditDialog({
               />
             </Button>
           </Box>
+        </Box>
         </Box>
       </DialogContent>
       <DialogActions>
