@@ -15,6 +15,13 @@ npm run lint     # ESLint
 npm run preview  # preview production build
 ```
 
+**`launch-app.bat`** (Windows) — one-click launcher that:
+1. Checks for Git; installs via winget if missing (falls back to manual instructions if winget unavailable)
+2. Checks for Node.js 20+; installs/upgrades via winget if needed (same winget fallback)
+3. Fetches origin/main; stashes any local changes then pulls if behind
+4. Kills any process already listening on port 5173
+5. Runs `npm install` then `npm run dev -- --open` (Vite opens the browser automatically)
+
 No test suite exists yet.
 
 ## Architecture
