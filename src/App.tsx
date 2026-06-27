@@ -270,23 +270,6 @@ function AppContent() {
             );
           })}
         </Stepper>
-        {activeStep > 0 && (
-          <Box sx={{ mb: 2, flexShrink: 0 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => {
-                const target = activeStep - 1;
-                if (target < 2 || records.length > 0) {
-                  dispatch({ type: 'SET_ACTIVE_STEP', payload: target });
-                }
-              }}
-              aria-label="Go to previous step"
-            >
-              Back
-            </Button>
-          </Box>
-        )}
         <Box
           sx={{
             flex: 1,
