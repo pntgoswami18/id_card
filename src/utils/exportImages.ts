@@ -4,8 +4,19 @@ import JSZip from 'jszip';
 import html2canvas from 'html2canvas';
 import CardCanvas from '../components/CardCanvas/CardCanvas';
 import type { Template, CardRecord } from '../types';
+import { saveBlob, safeFileName } from './saveFile';
 
 export type ExportFormat = 'png' | 'jpeg';
+
+/** Written into the export ZIP as `manifest.json`; read back by the importer. */
+export interface ExportManifest {
+  version: 1;
+  workspaceName: string;
+  cardWidthMm: number;
+  cardHeightMm: number;
+  format: ExportFormat;
+  count: number;
+}
 
 export interface ExportOptions {
   format: ExportFormat;
@@ -14,6 +25,14 @@ export interface ExportOptions {
   /** html2canvas pixel ratio — higher = sharper output. Default 3. */
   scale?: number;
   onProgress?: (done: number, total: number) => void;
+}
+
+/** One rendered card: a data URL plus the blob backing it. */
+export interface RenderedCard {
+  /** 0-based index into the `records` array this card was rendered from. */
+  recordIndex: number;
+  dataUrl: string;
+  blob: Blob;
 }
 
 async function waitForContainerReady(container: HTMLElement): Promise<void> {
@@ -32,18 +51,19 @@ async function waitForContainerReady(container: HTMLElement): Promise<void> {
 }
 
 /**
- * Renders each card in `indices` off-screen, captures it with html2canvas,
- * bundles all images into a ZIP, and triggers a browser download.
+ * Renders each card in `indices` off-screen and captures it with html2canvas.
+ * Returns the rendered cards (data URL + blob) and any per-card error messages.
+ * This is the shared rendering core used both by ZIP export and by aggregate-PDF
+ * generation — keep it free of any download/zip concerns.
  */
-export async function exportCardsAsImages(
+export async function renderCardsToImages(
   template: Template,
   records: CardRecord[],
   indices: number[],
   cardWidthMm: number,
   cardHeightMm: number,
-  workspaceName: string,
   options: ExportOptions,
-): Promise<void> {
+): Promise<{ cards: RenderedCard[]; errors: string[] }> {
   const {
     format,
     renderWidthPx = 400,
@@ -51,11 +71,10 @@ export async function exportCardsAsImages(
     onProgress,
   } = options;
 
-  const zip = new JSZip();
-  const ext = format === 'jpeg' ? 'jpg' : 'png';
   const mimeType = `image/${format}`;
   const quality = format === 'jpeg' ? 0.92 : undefined;
   const errors: string[] = [];
+  const cards: RenderedCard[] = [];
 
   // Create a single reusable container + root for all cards
   const container = document.createElement('div');
@@ -144,8 +163,7 @@ export async function exportCardsAsImages(
             );
           });
 
-          const filename = `card-${String(i + 1).padStart(String(indices.length).length, '0')}.${ext}`;
-          zip.file(filename, blob);
+          cards.push({ recordIndex, dataUrl: canvas.toDataURL(mimeType, quality), blob });
         } catch (err) {
           errors.push(`Card ${i + 1}: ${err instanceof Error ? err.message : String(err)}`);
         }
@@ -161,53 +179,55 @@ export async function exportCardsAsImages(
     }
   }
 
-  if (errors.length > 0 && errors.length === indices.length) {
+  return { cards, errors };
+}
+
+/**
+ * Renders each card in `indices` off-screen, bundles all images into a ZIP
+ * (alongside a `manifest.json` recording the card's mm dimensions and format),
+ * and saves it. The manifest lets the aggregate-PDF importer lay the images out
+ * without asking the user for the card size.
+ */
+export async function exportCardsAsImages(
+  template: Template,
+  records: CardRecord[],
+  indices: number[],
+  cardWidthMm: number,
+  cardHeightMm: number,
+  workspaceName: string,
+  options: ExportOptions,
+): Promise<void> {
+  const { format } = options;
+  const ext = format === 'jpeg' ? 'jpg' : 'png';
+
+  const { cards, errors } = await renderCardsToImages(
+    template, records, indices, cardWidthMm, cardHeightMm, options,
+  );
+
+  if (cards.length === 0) {
     throw new Error(`All cards failed to export:\n${errors.join('\n')}`);
   }
 
-  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const zip = new JSZip();
+  const pad = String(indices.length).length;
+  cards.forEach((card, i) => {
+    zip.file(`card-${String(i + 1).padStart(pad, '0')}.${ext}`, card.blob);
+  });
 
-  const safeName = workspaceName
-    .replace(/[^a-z0-9_\-]/gi, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  const fileName = `${safeName || 'cards'}-export.zip`;
-
-  type SavePickerOpts = {
-    suggestedName?: string;
-    types?: { description?: string; accept: Record<string, string[]> }[];
+  const manifest: ExportManifest = {
+    version: 1,
+    workspaceName,
+    cardWidthMm,
+    cardHeightMm,
+    format,
+    count: cards.length,
   };
-  type FSWritable = { write(data: BufferSource | Blob | string): Promise<void>; close(): Promise<void> };
-  type FSFileHandle = { createWritable(): Promise<FSWritable> };
-  const win = window as Window & { showSaveFilePicker?: (opts?: SavePickerOpts) => Promise<FSFileHandle> };
+  zip.file('manifest.json', JSON.stringify(manifest, null, 2));
 
-  if (win.showSaveFilePicker) {
-    try {
-      const fileHandle = await win.showSaveFilePicker({
-        suggestedName: fileName,
-        types: [{ description: 'ZIP Archive', accept: { 'application/zip': ['.zip'] } }],
-      });
-      const writable = await fileHandle.createWritable();
-      try {
-        await writable.write(zipBlob);
-      } finally {
-        await writable.close();
-      }
-      return;
-    } catch (err) {
-      // User cancelled the picker — abort silently
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      // Fall through to legacy download on other errors
-    }
-  }
-
-  const url = URL.createObjectURL(zipBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  // Delay revocation so the browser has time to initiate the download
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const fileName = `${safeFileName(workspaceName)}-export.zip`;
+  await saveBlob(zipBlob, fileName, {
+    description: 'ZIP Archive',
+    accept: { 'application/zip': ['.zip'] },
+  });
 }

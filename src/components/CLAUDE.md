@@ -5,7 +5,7 @@
 - **DesignStep.tsx** — Step 1: card canvas (`CardCanvas` in `designMode=true`) + toolbar (add elements, template picker, background/watermark panel, save template menu).
 - **DataStep.tsx** — Step 2: CSV file upload + column→binding mapping; dispatches `SET_CSV_DATA`, `SET_COLUMN_MAPPING`, and `SET_RECORDS`.
 - **PreviewStep.tsx** — Step 3: paginated, searchable grid of rendered cards with per-card edit, webcam photo capture, image crop, and bulk photo assignment from a folder. The "Bulk add photos" button (hidden when no image binding exists on the template) opens a folder picker via a hidden `<input webkitdirectory>`; images are read in parallel with `Promise.all`/`FileReader` and handed to `BulkPhotoModal`.
-- **PrintStep.tsx** — Step 4: print settings, live print preview, and image export (PNG/PDF). Imports `computeLayout` and `computeEffectivePaperDims` from `PrintSettings.tsx`.
+- **PrintStep.tsx** — Step 4: print settings, live print preview, image export (PNG/JPG ZIP), and "Combine into one PDF" (opens `CombinePdfDialog`). Imports `computeLayout` and `computeEffectivePaperDims` from `PrintSettings.tsx`.
 
 ## Sub-components
 
@@ -21,6 +21,7 @@
 - **PrintSettings.tsx** — Print settings form (paper size, margins, orientation, presets). Also exports `computeLayout` and `computeEffectivePaperDims` — import these from here, not from a utils file.
 - **PrintView.tsx** — Stateless print layout: renders pages of cards using `computeLayout`; consumed by PrintStep for the print dialog and image export.
 - **WebcamCapture.tsx** — Modal webcam capture; starts/stops the media stream on `open` toggle.
+- **CombinePdfDialog.tsx** — Dialog driving the aggregate-PDF feature. Two tabs: "From workspaces" (reads each selected workspace's data from localStorage and renders its cards to JPEG via `renderCardsToImages`) and "From exported images" (`importCardsFromFiles` for ZIPs/loose images, with a manual card-size field for unsized images). Both feed `aggregateCardsToPdf`. Shared paper-size/margin/gap controls; defaults seeded from the active workspace's print settings.
 
 ## Critical gotchas
 

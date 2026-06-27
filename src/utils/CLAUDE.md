@@ -6,7 +6,10 @@
 - **workspaceFile.ts** — File System Access API save/open for `.idcard` workspace files and `.idtemplate` template files; also owns FSA type declarations and autosave-pref helpers.
 - **userTemplates.ts** — localStorage CRUD for user-saved templates (list of `{ meta, template }` entries).
 - **csv.ts** — Thin PapaParse wrapper; parses a `File` into `{ headers, rows }`.
-- **exportImages.ts** — Renders cards off-screen via `CardCanvas`, captures each with html2canvas, bundles into a ZIP, and triggers a browser download (or FSA save picker).
+- **exportImages.ts** — Renders cards off-screen via `CardCanvas`, captures each with html2canvas. `renderCardsToImages` is the shared rendering core (returns `{ recordIndex, dataUrl, blob }[]`); `exportCardsAsImages` calls it, bundles into a ZIP (with a `manifest.json` recording card mm size + format), and saves via `saveBlob`.
+- **aggregatePdf.ts** — Shared jsPDF engine. `aggregateCardsToPdf(cards, opts)` packs `CardImage[]` (data URL + mm size) densely into one PDF, grouping by exact mm size so mixed sizes each get their own page run. Reuses `computeLayout`/`computeEffectivePaperDims` from `PrintSettings.tsx`. This is what eliminates per-workspace last-page waste.
+- **importImages.ts** — `importCardsFromFiles(files)` reads picked ZIPs/images into `{ sized, unsized, warnings }`. ZIPs with a `manifest.json` come back fully sized; loose images / manifest-less ZIPs come back `unsized` and the caller must supply dimensions.
+- **saveFile.ts** — `saveBlob(blob, fileName, accept)` (FSA save picker with `<a download>` fallback) and `safeFileName(name)`. Used by `exportImages.ts` and `aggregatePdf.ts`.
 - **backup.ts** — Full-app backup (all workspaces + user templates + print presets) to a JSON download; and restore from that JSON back to localStorage.
 - **file.ts** — Single helper: `readFileAsDataUrl(file)` — reads a `File` as a base64 data URL.
 - **id.ts** — `generateId(prefix?)` — monotonic unique element IDs (prefix + timestamp + counter).
