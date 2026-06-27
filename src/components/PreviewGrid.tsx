@@ -54,74 +54,62 @@ export default function PreviewGrid({
       {records.map((record, i) => {
         const globalIndex = recordGlobalIndices?.[i] ?? i;
         return (
-        <Card
+        <Box
           key={record.id}
           sx={{
             cursor: 'pointer',
             border: selectedSet.has(globalIndex) ? '2px solid' : '1px solid',
             borderColor: selectedSet.has(globalIndex) ? 'primary.main' : 'divider',
+            borderRadius: 0,
+            p: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.5,
+            bgcolor: 'background.paper',
           }}
           onClick={() => onCardClick(globalIndex)}
         >
-          <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-              <Checkbox
-                size="small"
-                checked={selectedSet.has(globalIndex)}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  onToggleSelect(globalIndex);
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+            <Checkbox
+              size="small"
+              checked={selectedSet.has(globalIndex)}
+              onChange={(e) => {
+                e.stopPropagation();
+                onToggleSelect(globalIndex);
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <Box
+              sx={{
+                position: 'relative',
+                width: CARD_PREVIEW_WIDTH_PX,
+                height: previewHeightPx,
+                overflow: 'hidden',
+                flexShrink: 0,
+              }}
+            >
               <Box
                 sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  height: previewHeightPx,
-                  overflow: 'hidden',
-                  bgcolor: 'action.hover',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: canvasWidthPx,
+                  height: canvasHeightPx,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
                 }}
               >
-                <Box
-                  sx={{
-                    position: 'relative',
-                    width: CARD_PREVIEW_WIDTH_PX,
-                    height: previewHeightPx,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: canvasWidthPx,
-                      height: canvasHeightPx,
-                      transform: `scale(${scale})`,
-                      transformOrigin: 'top left',
-                    }}
-                  >
-                    <CardCanvas
-                      template={template}
-                      record={record}
-                      widthMm={wMm}
-                      heightMm={hMm}
-                      designMode={false}
-                    />
-                  </Box>
-                </Box>
+                <CardCanvas
+                  template={template}
+                  record={record}
+                  widthMm={wMm}
+                  heightMm={hMm}
+                  designMode={false}
+                />
               </Box>
             </Box>
-          </CardContent>
-        </Card>
+          </Box>
+        </Box>
       );})}
     </Box>
   );
