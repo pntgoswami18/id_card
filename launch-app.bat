@@ -129,7 +129,9 @@ if !ERRORLEVEL! neq 0 (
         if !ERRORLEVEL! neq 0 (
             echo     WARNING: Pull encountered issues. Continuing with current version.
         ) else (
-            echo     Updated to latest version.
+            echo     Updated to latest version. Restarting with new version...
+            start "ID Card App - Dev Server" "%~f0"
+            exit /b 0
         )
     ) else (
         echo     Already up to date.
