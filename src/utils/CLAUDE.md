@@ -33,6 +33,8 @@
 
 `lib.dom` does not include File System Access API types. Local declarations (`FSWritable`, `WorkspaceFileHandle`, `FSAFileHandle`, `SavePickerOpts`, `OpenPickerOpts`, `WindowWithFSA`) live at the top of `workspaceFile.ts`. Do not install `@types/wicg-file-system-access` — use the local types.
 
+`WorkspaceFileHandle` includes a `name: string` field (the filename) so the UI can display the linked file name. When constructing a mock or stub handle, always include `name`.
+
 `exportImages.ts` has its own inline FSA type aliases (`FSWritable`, `FSFileHandle`, `SavePickerOpts`) scoped to that function. This is intentional — they only cover `BufferSource | Blob | string` writes, not the workspace file write shape.
 
 ## FSA fallback — always provide one
