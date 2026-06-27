@@ -157,7 +157,6 @@ export default function CardEditDialog({
                 height: previewHeight,
                 position: 'relative',
                 overflow: 'hidden',
-                borderRadius: 1,
                 boxShadow: 3,
                 flexShrink: 0,
               }}
