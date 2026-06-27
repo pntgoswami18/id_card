@@ -5,9 +5,11 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import IconButton from '@mui/material/IconButton';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import CloseIcon from '@mui/icons-material/Close';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 
 type Photo = { name: string; dataUrl: string };
@@ -24,6 +26,7 @@ export default function BulkPhotoModal({ photos, recordCount, onConfirm, onClose
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>('asc');
   const dragIndexRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const handleSort = (_: React.MouseEvent, value: 'asc' | 'desc' | null) => {
     if (!value) return;
@@ -65,6 +68,34 @@ export default function BulkPhotoModal({ photos, recordCount, onConfirm, onClose
   const handleDragEnd = () => {
     dragIndexRef.current = null;
     setDragOverIndex(null);
+  };
+
+  const handleRemove = (index: number) => {
+    setOrder((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleReselectFolder = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
+    e.target.value = '';
+    if (files.length === 0) return;
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise<Photo | null>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve({ name: file.name, dataUrl: reader.result as string });
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+          })
+      )
+    ).then((results) => {
+      const newPhotos = results.filter((r): r is Photo => r !== null);
+      if (newPhotos.length > 0) {
+        setOrder(newPhotos);
+        setSortDir('asc');
+      }
+    });
   };
 
   const assignCount = Math.min(order.length, recordCount);
@@ -119,6 +150,14 @@ export default function BulkPhotoModal({ photos, recordCount, onConfirm, onClose
               <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0 }}>
                 #{index + 1}
               </Typography>
+              <IconButton
+                size="small"
+                onClick={() => handleRemove(index)}
+                sx={{ flexShrink: 0, ml: 0.5 }}
+                aria-label={`Remove ${photo.name}`}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
             </Box>
           ))}
         </Box>
@@ -131,7 +170,20 @@ export default function BulkPhotoModal({ photos, recordCount, onConfirm, onClose
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="contained" onClick={() => onConfirm(order)}>
+          <Button variant="outlined" onClick={() => folderInputRef.current?.click()}>
+            Reselect folder
+          </Button>
+          <input
+            ref={folderInputRef}
+            type="file"
+            // @ts-expect-error webkitdirectory is not in standard HTMLInputElement types
+            webkitdirectory=""
+            accept="image/*"
+            multiple
+            style={{ display: 'none' }}
+            onChange={handleReselectFolder}
+          />
+          <Button variant="contained" onClick={() => onConfirm(order)} disabled={order.length === 0}>
             Confirm
           </Button>
         </Box>
