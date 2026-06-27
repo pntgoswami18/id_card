@@ -3,10 +3,10 @@
   "configurations": [
     {
       "name": "id-card-dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [".claude/dev.sh"],
       "port": 5173,
-      "autoPort": false
+      "autoPort": true
     }
   ]
 }
