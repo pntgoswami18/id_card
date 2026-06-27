@@ -185,9 +185,7 @@ function AppContent() {
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          maxWidth: 960,
           width: '100%',
-          mx: 'auto',
           p: { xs: 2, sm: 3 },
         }}
       >

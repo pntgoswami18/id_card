@@ -83,7 +83,6 @@ export default function PreviewGrid({
                   alignItems: 'center',
                   height: previewHeightPx,
                   overflow: 'hidden',
-                  borderRadius: 1,
                   bgcolor: 'action.hover',
                 }}
               >
