@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "agent",
+            "if": "Bash(git commit*)",
+            "async": true,
+            "statusMessage": "Updating CLAUDE.md files...",
+            "timeout": 180,
+            "prompt": "A git commit was just made in /Users/punitgoswami/dev-tools/id_card. Your job is to update CLAUDE.md files to stay in sync with any source code changes.\n\nStep 1 — Loop guard: run `git show --name-only --format='' HEAD` to list changed files. If every file in that list is a CLAUDE.md file, stop immediately and do nothing.\n\nStep 2 — Find affected directories: from the list of changed files, collect the unique directory paths (e.g. src/utils/foo.ts → src/utils, src/components/Bar.tsx → src/components). Ignore .claude/, node_modules/, and dist/.\n\nStep 3 — Update CLAUDE.md files: for each affected directory, check whether a CLAUDE.md exists there. If it does, read the changed source files and the existing CLAUDE.md, then update the CLAUDE.md sections that describe what changed — new exports, removed functions, changed behaviour, added gotchas. Do NOT rewrite sections unrelated to the changed files. If no CLAUDE.md exists in the directory but a parent directory has one (e.g. src/utils/ has no CLAUDE.md but src/ does), update the parent's CLAUDE.md only if the change affects something it already describes.\n\nStep 4 — Commit: after updating CLAUDE.md files, run:\n  git add -f $(git ls-files --others --exclude-standard | grep 'CLAUDE.md') $(git ls-files -m | grep 'CLAUDE.md') 2>/dev/null\n  git diff --cached --quiet && git diff --quiet -- '**CLAUDE.md' || git commit -m 'docs: sync CLAUDE.md with recent changes'\n\nIf no CLAUDE.md files were modified, skip Step 4."
+          }
+        ]
+      }
+    ]
+  }
+}
