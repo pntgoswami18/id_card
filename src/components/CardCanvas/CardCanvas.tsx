@@ -45,10 +45,21 @@ function renderBackground(background: BackgroundConfig | null | undefined, baseS
     const dir = SAFE_DIRS.has(background.gradientDirection ?? '') ? background.gradientDirection! : 'to bottom';
     const c2 = background.gradientColor2 || background.value;
     base.background = `linear-gradient(${dir}, ${background.value}, ${c2})`;
-  } else if (background.type === 'image' && background.value) {
-    base.backgroundImage = `url("${background.value.replace(/"/g, '%22')}")`;
-    base.backgroundSize = 'cover';
-    base.backgroundPosition = 'center';
+  } else if (background.type === 'image') {
+    // Use an <img> element instead of CSS background-image so that html2canvas
+    // renders it via drawImage() and correctly applies its scale multiplier.
+    // CSS background-image is sampled at layout-pixel size in html2canvas 1.4.x,
+    // ignoring the scale parameter and producing blurry exported images.
+    if (isSafeImageSrc(background.value)) {
+      return (
+        <img
+          src={background.value}
+          alt=""
+          style={{ ...baseStyle, objectFit: 'cover', objectPosition: 'center' }}
+        />
+      );
+    }
+    // Unsafe or missing src: fall through to plain div (no background rendered)
   }
   return <div style={base} />;
 }
