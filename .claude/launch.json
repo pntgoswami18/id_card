@@ -6,7 +6,8 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": [".claude/dev.sh"],
       "port": 5173,
-      "autoPort": true
+      "autoPort": true,
+      "openBrowser": true
     }
   ]
 }

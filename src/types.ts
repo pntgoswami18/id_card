@@ -115,6 +115,11 @@ export interface PrintPreset {
   widthMm: number;
   heightMm: number;
   orientation: 'portrait' | 'landscape';
+  paperWidthMm?: number;
+  paperHeightMm?: number;
+  pageMarginMm?: number;
+  cardGapMm?: number;
+  paperOrientation?: 'portrait' | 'landscape' | 'auto';
 }
 
 export interface PrintSettings {

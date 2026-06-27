@@ -57,7 +57,7 @@ function AppContent() {
   const dispatch = useAppDispatch();
   const hydratedRef = useRef(false);
   const skipAutoSaveRef = useRef(true);
-  const fileHandleRef = useRef<WorkspaceFileHandle | null>(null);
+  const fileHandleRef = useRef<Map<string, WorkspaceFileHandle>>(new Map());
   const [autoSaveToFile, setAutoSaveToFile] = useState(() => getAutoSavePref());
   const [needsSetup, setNeedsSetup] = useState(() => localStorage.getItem(LIST_KEY) === null);
 
@@ -94,18 +94,21 @@ function AppContent() {
     };
     const t = setTimeout(() => {
       saveWorkspaceData(currentWorkspaceId, { ...data, csvData: null });
-      if (autoSaveToFile && fileHandleRef.current) {
+      if (autoSaveToFile) {
         // Always autosave from the root so children are included in the file.
         const rootId = workspaceList.find((w) => w.id === currentWorkspaceId)?.parentId ?? currentWorkspaceId;
-        const rootMeta = workspaceList.find((w) => w.id === rootId);
-        const rootData = rootId === currentWorkspaceId ? data : (getWorkspaceData(rootId) ?? data);
-        const rootName = rootMeta?.name ?? currentWorkspaceName;
-        const childMetas = workspaceList.filter((w) => w.parentId === rootId);
-        const children = childMetas.map((meta) => ({
-          meta: { name: meta.name, ...(meta.logo ? { logo: meta.logo } : {}) },
-          data: (meta.id === currentWorkspaceId ? data : getWorkspaceData(meta.id)) ?? getDefaultWorkspaceData(),
-        }));
-        void writeWorkspaceToHandle(fileHandleRef.current, rootName, rootData, children);
+        const handle = fileHandleRef.current.get(rootId);
+        if (handle) {
+          const rootMeta = workspaceList.find((w) => w.id === rootId);
+          const rootData = rootId === currentWorkspaceId ? data : (getWorkspaceData(rootId) ?? data);
+          const rootName = rootMeta?.name ?? currentWorkspaceName;
+          const childMetas = workspaceList.filter((w) => w.parentId === rootId);
+          const children = childMetas.map((meta) => ({
+            meta: { name: meta.name, ...(meta.logo ? { logo: meta.logo } : {}) },
+            data: (meta.id === currentWorkspaceId ? data : getWorkspaceData(meta.id)) ?? getDefaultWorkspaceData(),
+          }));
+          void writeWorkspaceToHandle(handle, rootName, rootData, children);
+        }
       }
     }, 400);
     return () => clearTimeout(t);
@@ -196,7 +199,6 @@ function AppContent() {
           <WorkspaceSwitcher
             workspaceList={workspaceList}
             currentWorkspaceId={currentWorkspaceId}
-            currentWorkspaceData={currentWorkspaceData}
             currentWorkspaceLogo={currentWorkspaceLogo}
             autoSaveToFile={autoSaveToFile}
             onAutoSaveToFileChange={(v) => { setAutoSaveToFile(v); setAutoSavePref(v); }}

@@ -7,6 +7,7 @@ interface FSWritable {
   close(): Promise<void>;
 }
 export interface WorkspaceFileHandle {
+  name: string;
   createWritable(): Promise<FSWritable>;
 }
 type FSAFileHandle = WorkspaceFileHandle & { getFile(): Promise<File> };

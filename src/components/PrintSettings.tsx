@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -39,6 +39,7 @@ function detectPaperSizeId(w: number, h: number): string {
   return match ? match.id : 'custom';
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function computeLayout(
   paperW: number,
   paperH: number,
@@ -55,11 +56,7 @@ export function computeLayout(
   return { cols, rows, perPage: cols * rows };
 }
 
-/**
- * Returns the actual paper width × height after applying orientation.
- * The stored paperWidthMm/paperHeightMm are always in portrait order (shorter × taller).
- * 'auto' picks whichever orientation fits more cards per page.
- */
+// eslint-disable-next-line react-refresh/only-export-components
 export function computeEffectivePaperDims(
   rawW: number,
   rawH: number,
@@ -121,11 +118,6 @@ export default function PrintSettingsComponent({
 }: PrintSettingsProps) {
   const [unit, setUnit] = useState<MeasurementUnit>('mm');
 
-  useEffect(() => {
-    onPresetsChange(loadPrintPresets());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const rawPaperW = settings.paperWidthMm  ?? 210;
   const rawPaperH = settings.paperHeightMm ?? 297;
   const margin    = settings.pageMarginMm  ?? 5;
@@ -152,13 +144,17 @@ export default function PrintSettingsComponent({
   const handleSavePreset = () => {
     const name = prompt('Preset name');
     if (!name?.trim()) return;
-    const id = `preset-${Date.now()}`;
     const preset: PrintPreset = {
-      id,
+      id: `preset-${Date.now()}`,
       name: name.trim(),
       widthMm: settings.widthMm,
       heightMm: settings.heightMm,
       orientation: settings.orientation,
+      paperWidthMm: settings.paperWidthMm,
+      paperHeightMm: settings.paperHeightMm,
+      pageMarginMm: settings.pageMarginMm,
+      cardGapMm: settings.cardGapMm,
+      paperOrientation: settings.paperOrientation,
     };
     savePrintPreset(preset);
     onPresetsChange(loadPrintPresets());
@@ -169,7 +165,15 @@ export default function PrintSettingsComponent({
       widthMm: p.widthMm,
       heightMm: p.heightMm,
       orientation: p.orientation,
+      ...(p.paperWidthMm  != null && { paperWidthMm:  p.paperWidthMm  }),
+      ...(p.paperHeightMm != null && { paperHeightMm: p.paperHeightMm }),
+      ...(p.pageMarginMm  != null && { pageMarginMm:  p.pageMarginMm  }),
+      ...(p.cardGapMm     != null && { cardGapMm:     p.cardGapMm     }),
+      ...(p.paperOrientation != null && { paperOrientation: p.paperOrientation }),
     });
+    if (p.paperWidthMm != null && p.paperHeightMm != null) {
+      setSizeId(detectPaperSizeId(p.paperWidthMm, p.paperHeightMm));
+    }
   };
 
   const handleDeletePreset = (id: string) => {
