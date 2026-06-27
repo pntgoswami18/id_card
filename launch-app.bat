@@ -66,7 +66,7 @@ echo The app will open at http://localhost:5173 (or the port shown below).
 echo Press Ctrl+C to stop the server.
 echo.
 
-call npm run dev
+call npm run dev -- --open
 
 pause
 exit /b 0
