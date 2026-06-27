@@ -194,20 +194,18 @@ export default function WorkspaceSwitcher({
     const name = newName.trim();
     if (!name) return;
     const logo = newLogo ?? undefined;
-    // Close the name dialog before the OS file picker opens (required for focus/gesture reasons).
-    setNewOpen(false); setNewName(''); setNewLogo(null);
+    setNewOpen(false); // close the normal dialog before the OS file picker opens
 
     clearFileHandle();
     onSaveCurrent();
 
     const defaultData = { ...getDefaultWorkspaceData(), logo };
     const handle = await saveWorkspaceWithPicker(name, defaultData);
+    // Clear form fields after the picker resolves regardless of outcome.
+    setNewName(''); setNewLogo(null);
     // On FSA browsers a null handle means the user cancelled — abort workspace creation.
     // On non-FSA browsers saveWorkspaceWithPicker triggers a download and returns null, so proceed.
-    if (handle === null && hasSaveFilePicker()) {
-      setSetupStep('choose');
-      return;
-    }
+    if (handle === null && hasSaveFilePicker()) return;
 
     const meta = createWorkspace(name, logo);
     const list = getWorkspaceList();

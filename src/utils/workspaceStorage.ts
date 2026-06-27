@@ -44,13 +44,10 @@ function safeParse<T>(raw: string | null, fallback: T): T {
 
 export function getWorkspaceList(): WorkspaceListState {
   const raw = localStorage.getItem(LIST_KEY);
-  const fallback: WorkspaceListState = {
-    currentId: '',
-    workspaces: [{ id: 'default', name: 'Default' }],
-  };
+  const fallback: WorkspaceListState = { currentId: '', workspaces: [] };
   const parsed = safeParse<WorkspaceListState>(raw, fallback);
   if (!parsed.workspaces?.length) {
-    parsed.workspaces = [{ id: 'default', name: 'Default' }];
+    return { currentId: '', workspaces: [] };
   }
   if (!parsed.currentId && parsed.workspaces[0]) {
     parsed.currentId = parsed.workspaces[0].id;
