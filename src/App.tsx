@@ -58,6 +58,8 @@ function AppContent() {
   const hydratedRef = useRef(false);
   const skipAutoSaveRef = useRef(true);
   const fileHandleRef = useRef<Map<string, WorkspaceFileHandle>>(new Map());
+  const currentWorkspaceIdRef = useRef(currentWorkspaceId);
+  const currentWorkspaceDataRef = useRef<WorkspaceData | null>(null);
   const [autoSaveToFile, setAutoSaveToFile] = useState(() => getAutoSavePref());
   const [needsSetup, setNeedsSetup] = useState(() => localStorage.getItem(LIST_KEY) === null);
 
@@ -140,6 +142,9 @@ function AppContent() {
     csvData,
   }), [template, records, columnMapping, printPresets, printSettings, selectedCardIndices, currentTemplateSource, currentWorkspaceLogo, csvData]);
 
+  currentWorkspaceIdRef.current = currentWorkspaceId;
+  currentWorkspaceDataRef.current = currentWorkspaceData;
+
   const stepContent = useMemo(() => [
     <DesignStep key="design" />,
     <DataStep key="data" />,
@@ -148,11 +153,12 @@ function AppContent() {
   ], []);
 
   const handleSaveCurrent = useCallback((overrides?: Partial<WorkspaceData>) => {
-    if (currentWorkspaceId) {
-      const toSave = overrides ? { ...currentWorkspaceData, ...overrides } : currentWorkspaceData;
-      saveWorkspaceData(currentWorkspaceId, { ...toSave, csvData: null });
-    }
-  }, [currentWorkspaceId, currentWorkspaceData]);
+    const id = currentWorkspaceIdRef.current;
+    if (!id) return;
+    const base = currentWorkspaceDataRef.current!;
+    const toSave = overrides ? { ...base, ...overrides } : base;
+    saveWorkspaceData(id, { ...toSave, csvData: null });
+  }, []);
 
   const handleLoadWorkspace = useCallback((data: WorkspaceData) => {
     skipAutoSaveRef.current = true;
