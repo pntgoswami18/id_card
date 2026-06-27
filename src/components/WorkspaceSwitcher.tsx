@@ -49,6 +49,7 @@ import {
 } from '../utils/workspaceStorage';
 import {
   saveWorkspaceWithPicker,
+  writeWorkspaceToHandle,
   openWorkspaceFilePickerWithHandle,
   readWorkspaceFile,
   hasOpenFilePicker,
@@ -289,10 +290,15 @@ export default function WorkspaceSwitcher({
         data: getWorkspaceData(meta.id) ?? getDefaultWorkspaceData(),
       }));
 
-      const handle = await saveWorkspaceWithPicker(rootName, rootData, children);
-      if (handle) {
-        fileHandleRef.current = handle;
-        setHasFileHandle(true);
+      if (fileHandleRef.current) {
+        // Workspace was opened from a file — write back to the same file.
+        await writeWorkspaceToHandle(fileHandleRef.current, rootName, rootData, children);
+      } else {
+        const handle = await saveWorkspaceWithPicker(rootName, rootData, children);
+        if (handle) {
+          fileHandleRef.current = handle;
+          setHasFileHandle(true);
+        }
       }
     } finally {
       setSaving(false);
