@@ -72,7 +72,6 @@ export async function exportCardsAsImages(
     left: 0;
     width: ${cardWidthMm}mm;
     height: ${cardHeightMm}mm;
-    transform-origin: top left;
   `;
   container.appendChild(scalerDiv);
 
@@ -81,17 +80,24 @@ export async function exportCardsAsImages(
     document.body.appendChild(container);
     appended = true;
 
-    // Measure actual rendered size (accounts for browser zoom and dpi).
-    // CSS transform scale() does not change layout dimensions, so we must
-    // measure naturalWidth before applying any transform.
+    // Measure the card's natural CSS pixel size (accounts for browser zoom and dpi).
     const { width: naturalWidth, height: naturalHeight } = scalerDiv.getBoundingClientRect();
-    const actualScale = naturalWidth > 0 ? renderWidthPx / naturalWidth : 1;
-    const renderHeightPx = Math.round(naturalHeight * actualScale);
+    const naturalWidthPx = Math.round(naturalWidth);
+    const naturalHeightPx = Math.round(naturalHeight);
 
-    container.style.width = `${renderWidthPx}px`;
-    container.style.height = `${renderHeightPx}px`;
-    container.style.left = `-${renderWidthPx + 100}px`;
-    scalerDiv.style.transform = `scale(${actualScale})`;
+    // Fold all upscaling into html2canvas's own `scale` parameter instead of using a
+    // CSS transform on the wrapper div. A CSS transform causes html2canvas to rasterise
+    // background-image CSS properties at the element's pre-transform layout size and then
+    // magnify the result via the transform matrix, producing blurry / pixelated backgrounds.
+    // html2canvas's `scale` parameter has no such issue — it renders each CSS pixel as
+    // `scale` output pixels natively, backgrounds included.
+    // Output image size remains renderWidthPx × scale pixels wide (identical to before).
+    const h2cScale = naturalWidthPx > 0 ? (renderWidthPx * scale) / naturalWidthPx : scale;
+
+    container.style.width = `${naturalWidthPx}px`;
+    container.style.height = `${naturalHeightPx}px`;
+    container.style.left = `-${naturalWidthPx + 100}px`;
+    // No CSS transform — html2canvas handles all upscaling via h2cScale.
 
     const root = createRoot(scalerDiv);
 
@@ -121,9 +127,9 @@ export async function exportCardsAsImages(
           await waitForContainerReady(container);
 
           const canvas = await html2canvas(container, {
-            width: renderWidthPx,
-            height: renderHeightPx,
-            scale,
+            width: naturalWidthPx,
+            height: naturalHeightPx,
+            scale: h2cScale,
             useCORS: true,
             allowTaint: false,
             backgroundColor: '#ffffff',
