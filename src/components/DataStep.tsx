@@ -87,7 +87,6 @@ export default function DataStep() {
             onMappingChange={handleMappingChange}
             onGenerate={handleGenerate}
             onUploadDifferent={() => {
-              dispatch({ type: 'SET_CSV_DATA', payload: null });
               dispatch({ type: 'SET_COLUMN_MAPPING', payload: {} });
               dispatch({ type: 'SET_RECORDS', payload: [] });
             }}

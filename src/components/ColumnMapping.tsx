@@ -45,7 +45,7 @@ export default function ColumnMappingComponent({
       <Typography variant="subtitle2" gutterBottom>
         Map CSV columns to template fields
       </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 220px))', gap: 2 }}>
         {uniqueBindings.map((binding) => (
           <FormControl key={binding} fullWidth size="small">
             <InputLabel>{binding}</InputLabel>
@@ -69,7 +69,7 @@ export default function ColumnMappingComponent({
           </FormControl>
         ))}
       </Box>
-      <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+      <Box sx={{ display: 'flex', gap: 1, mt: 2, alignItems: 'center' }}>
         <Button
           variant="contained"
           onClick={onGenerate}
