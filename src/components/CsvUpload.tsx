@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import type { ParsedCsv } from '../utils/csv';
 import { parseCsv } from '../utils/csv';
 
@@ -13,6 +15,8 @@ interface CsvUploadProps {
 }
 
 export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: CsvUploadProps) {
+  const [loading, setLoading] = useState(false);
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -25,11 +29,14 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
       onError?.(new Error('CSV file must be under 50 MB.'));
       return;
     }
+    setLoading(true);
     try {
       const data = await parseCsv(file);
       onParsed(data);
     } catch (err) {
       onError?.(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,8 +59,13 @@ export default function CsvUpload({ onParsed, onError, expectedColumns = [] }: C
 
       {/* MUI Button rendered as <label> — input nested inside gives native
           label→input activation on both mouse click and keyboard (Space/Enter). */}
-      <Button component="label" variant="contained">
-        Upload CSV
+      <Button
+        component="label"
+        variant="contained"
+        disabled={loading}
+        startIcon={loading ? <CircularProgress size={16} color="inherit" /> : undefined}
+      >
+        {loading ? 'Processing…' : 'Upload CSV'}
         <input
           type="file"
           accept=".csv,text/csv"
