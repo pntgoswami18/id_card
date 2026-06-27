@@ -37,6 +37,9 @@ Apply this same swap anywhere you compute card pixel dimensions. `PreviewGrid` a
 ### WorkspaceSwitcher — template sync on `.idcard` import
 `LOAD_WORKSPACE_STATE` (the dispatch action) does **not** sync user templates embedded in a workspace file into `id-card-user-templates`. `restoreWorkspaceFile()` handles this explicitly: it calls `saveUserTemplate()` for every workspace/child whose `currentTemplateSource.type === 'user'` if the template id is not already present in localStorage. If you add new import paths, replicate this sync.
 
+### WorkspaceSwitcher — Save writes back to opened file
+`handleSaveWorkspace` checks `fileHandleRef.current` before showing the OS save picker. If a handle exists (set when a `.idcard` file was opened or previously saved via FSA), it calls `writeWorkspaceToHandle` directly — no picker is shown. The picker only appears when there is no handle yet (fresh workspace). This means "Save" and autosave both target the same file once a workspace is opened from disk.
+
 ### TemplatePicker patterns
 - **"Import from file" button**: uses `<Button component="label">` wrapping a hidden `<input type="file">`. This is the MUI `component="label"` pattern — do not replace with a `Box component="label"` or a separate click handler.
 - **`importAndSelect()`**: always assigns a fresh id (`user-${Date.now()}`), saves to localStorage via `saveUserTemplate`, reloads local state, calls `onSelect`, then calls `onClose`. Do not skip the id reassignment — it prevents silently overwriting an existing template with the same id.
