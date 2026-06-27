@@ -1,10 +1,9 @@
-import { useState, useEffect, useId } from 'react';
+import { useState, useEffect } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
-import Box from '@mui/material/Box';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -32,8 +31,6 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
   const [userTemplates, setUserTemplates] = useState(() => loadUserTemplates());
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
-  const importInputId = useId();
-
   // Refresh template list every time the dialog opens
   useEffect(() => {
     if (open) setUserTemplates(loadUserTemplates());
@@ -139,34 +136,15 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
       </DialogContent>
 
       <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
-        <Box
-          component="label"
-          htmlFor={importInputId}
-          tabIndex={0}
-          sx={{
-            display: 'inline-flex', alignItems: 'center', gap: 0.5,
-            cursor: 'pointer', userSelect: 'none',
-            px: 1.5, py: 0.5, borderRadius: 1, fontSize: '0.8125rem',
-            fontWeight: 500, lineHeight: 1.75, letterSpacing: '0.02857em',
-            textTransform: 'uppercase',
-            color: 'primary.main',
-            border: '1px solid',
-            borderColor: 'primary.main',
-            transition: 'background-color 0.2s',
-            '&:hover': { bgcolor: 'primary.main', color: 'primary.contrastText' },
-            '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
-          }}
-        >
-          <FileOpenIcon sx={{ fontSize: '1rem' }} />
+        <Button component="label" variant="outlined" startIcon={<FileOpenIcon />}>
           Import from file
-        </Box>
-        <input
-          id={importInputId}
-          type="file"
-          accept=".idtemplate,.json,application/json"
-          style={{ display: 'none' }}
-          onChange={handleImportInputChange}
-        />
+          <input
+            type="file"
+            accept=".idtemplate,.json,application/json"
+            style={{ display: 'none' }}
+            onChange={handleImportInputChange}
+          />
+        </Button>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
 
