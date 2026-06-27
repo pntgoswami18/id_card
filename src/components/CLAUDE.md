@@ -12,7 +12,7 @@
 - **WorkspaceSwitcher.tsx** — Workspace management menu (create, rename, delete, duplicate, save/open `.idcard` files). Rendered in the app header, not inside any step.
 - **TemplatePicker.tsx** — "Start From Template" modal, user-template-only list. Opened from DesignStep toolbar.
 - **BackgroundWatermarkPanel.tsx** — Sidebar panel (shown inside DesignStep) for background color/image and watermark config; toggled by the "Background / Watermark" button.
-- **CardEditDialog.tsx** — Per-card field override dialog opened from PreviewStep; accepts `overrides` and `fontSizeOverrides` keyed by binding.
+- **CardEditDialog.tsx** — Per-card field override dialog opened from PreviewStep; accepts `overrides` and `fontSizeOverrides` keyed by binding. Also requires `template: Template` and `printSettings` props to render a live `CardCanvas` preview alongside the edit fields. The preview uses the same scale/clip pattern as `PreviewGrid` (render at full px size, then CSS `transform: scale()`). `previewRecord` is built via `useMemo` from the current edit state so the preview updates as the user types.
 - **ColumnMapping.tsx** — Pure UI: maps CSV headers to template element bindings via dropdowns; used inside DataStep.
 - **CsvUpload.tsx** — File input wrapper that parses CSV and calls `onParsed`; used inside DataStep.
 - **ImageCropDialog.tsx** — Custom drag-handle crop dialog (no third-party library); used in PreviewStep after webcam capture or image upload.
