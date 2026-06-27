@@ -56,6 +56,7 @@ import {
   type WorkspaceFileHandle,
 } from '../utils/workspaceFile';
 import { readFileAsDataUrl } from '../utils/file';
+import { loadUserTemplates, saveUserTemplate } from '../utils/userTemplates';
 
 interface WorkspaceSwitcherProps {
   workspaceList: WorkspaceMeta[];
@@ -288,6 +289,24 @@ export default function WorkspaceSwitcher({
   // ---- Open Workspace ----
   const restoreWorkspaceFile = (wsFile: import('../utils/workspaceFile').WorkspaceFile) => {
     onSaveCurrent(); // flush any unsaved in-memory edits before switching away
+
+    // Sync user templates embedded in the imported file into the local user-templates store
+    // so they appear in the "My templates" section of the Start From Template modal.
+    // This handles the case where the file was created on a different machine (or after
+    // localStorage was cleared) where the originating user templates don't exist locally.
+    const existingIds = new Set(loadUserTemplates().map((t) => t.meta.id));
+    const syncTemplate = (data: WorkspaceData) => {
+      if (data.currentTemplateSource?.type === 'user' && data.template) {
+        const id = data.currentTemplateSource.id;
+        if (!existingIds.has(id)) {
+          saveUserTemplate(data.template);
+          existingIds.add(id);
+        }
+      }
+    };
+    syncTemplate(wsFile.data);
+    wsFile.children?.forEach((child) => syncTemplate(child.data));
+
     // Create a fresh root workspace entry so the opened file never clobbers an existing workspace.
     const rootId = createWorkspaceId();
     const rootEntry: WorkspaceMeta = { id: rootId, name: wsFile.name };
