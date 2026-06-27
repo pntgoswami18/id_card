@@ -18,6 +18,7 @@ import PreviewGrid from './PreviewGrid';
 import CardEditDialog from './CardEditDialog';
 import WebcamCapture from './WebcamCapture';
 import ImageCropDialog from './ImageCropDialog';
+import BulkPhotoModal from './BulkPhotoModal';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96, 192];
 
@@ -28,6 +29,8 @@ export default function PreviewStep() {
   const [webcamOpen, setWebcamOpen] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [pendingPhotoName, setPendingPhotoName] = useState('');
+  const [bulkPhotos, setBulkPhotos] = useState<{ name: string; dataUrl: string }[] | null>(null);
+  const bulkInputRef = useRef<HTMLInputElement>(null);
   const [photoDisplayNames, setPhotoDisplayNames] = useState<Record<number, Record<string, string>>>({});
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(24);
@@ -151,6 +154,39 @@ export default function PreviewStep() {
     setCropSrc(null);
   };
 
+  const handleBulkFolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
+    e.target.value = '';
+    if (files.length === 0) return;
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise<{ name: string; dataUrl: string } | null>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve({ name: file.name, dataUrl: reader.result as string });
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+          })
+      )
+    ).then((results) => {
+      const photos = results.filter((r): r is { name: string; dataUrl: string } => r !== null);
+      if (photos.length > 0) setBulkPhotos(photos);
+    });
+  };
+
+  const handleBulkConfirm = (orderedPhotos: { name: string; dataUrl: string }[]) => {
+    orderedPhotos.slice(0, records.length).forEach((photo, i) => {
+      dispatch({
+        type: 'UPDATE_RECORD_OVERRIDES',
+        payload: { index: i, overrides: { [imageBinding]: photo.dataUrl } },
+      });
+    });
+    setBulkPhotos(null);
+  };
+
+  const hasImageBinding = template.elements.some((e) => e.type === 'image' && e.binding);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'auto' }}>
       {records.length === 0 ? (
@@ -230,6 +266,26 @@ export default function PreviewStep() {
           )}
 
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2, alignItems: 'center' }}>
+            {hasImageBinding && (
+              <>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => bulkInputRef.current?.click()}
+                >
+                  Bulk add photos
+                </Button>
+                <input
+                  ref={bulkInputRef}
+                  type="file"
+                  // @ts-expect-error webkitdirectory is not in standard HTMLInputElement types
+                  webkitdirectory=""
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleBulkFolderChange}
+                />
+              </>
+            )}
             <Button
               size="small"
               variant="outlined"
@@ -337,6 +393,15 @@ export default function PreviewStep() {
         onClose={handleCropClose}
         onCrop={handleCropConfirm}
       />
+
+      {bulkPhotos != null && (
+        <BulkPhotoModal
+          photos={bulkPhotos}
+          recordCount={records.length}
+          onConfirm={handleBulkConfirm}
+          onClose={() => setBulkPhotos(null)}
+        />
+      )}
     </Box>
   );
 }
