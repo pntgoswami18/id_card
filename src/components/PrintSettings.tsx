@@ -194,65 +194,64 @@ export default function PrintSettingsComponent({
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* ── Unit selector ── */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Typography variant="subtitle2" sx={{ flexShrink: 0 }}>Units</Typography>
-        <ToggleButtonGroup
-          size="small"
-          exclusive
-          value={unit}
-          onChange={(_, v) => { if (v) setUnit(v); }}
-        >
-          <ToggleButton value="mm">mm</ToggleButton>
-          <ToggleButton value="cm">cm</ToggleButton>
-          <ToggleButton value="in">in</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      {/* ── Paper size ── */}
-      <Box>
-        <Typography variant="subtitle2" gutterBottom>Paper size</Typography>
-        <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-          <InputLabel>Paper size</InputLabel>
-          <Select
-            value={sizeId}
-            label="Paper size"
-            onChange={(e) => handlePaperSizeSelect(e.target.value)}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 620 }}>
+      {/* Row 1: Units + Paper size side by side */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 2, alignItems: 'start' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography variant="subtitle2">Units</Typography>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={unit}
+            onChange={(_, v) => { if (v) setUnit(v); }}
           >
-            {PAPER_SIZES.map((p) => (
-              <MenuItem key={p.id} value={p.id}>{p.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+            <ToggleButton value="mm">mm</ToggleButton>
+            <ToggleButton value="cm">cm</ToggleButton>
+            <ToggleButton value="in">in</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
 
-        {sizeId === 'custom' && (
-          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-            <TextField
-              size="small" label={`Paper width (${ul})`} type="number"
-              value={toDisplay(rawPaperW, u)}
-              onChange={(e) => onSettingsChange({ paperWidthMm: toMm(parseFloat(e.target.value) || 0, u) || 210 })}
-              inputProps={{ min: toDisplay(50, u), max: toDisplay(2000, u), step }}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              size="small" label={`Paper height (${ul})`} type="number"
-              value={toDisplay(rawPaperH, u)}
-              onChange={(e) => onSettingsChange({ paperHeightMm: toMm(parseFloat(e.target.value) || 0, u) || 297 })}
-              inputProps={{ min: toDisplay(50, u), max: toDisplay(2000, u), step }}
-              sx={{ flex: 1 }}
-            />
-          </Box>
-        )}
+        <Box>
+          <Typography variant="subtitle2" gutterBottom>Paper size</Typography>
+          <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+            <InputLabel>Paper size</InputLabel>
+            <Select
+              value={sizeId}
+              label="Paper size"
+              onChange={(e) => handlePaperSizeSelect(e.target.value)}
+            >
+              {PAPER_SIZES.map((p) => (
+                <MenuItem key={p.id} value={p.id}>{p.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {sizeId === 'custom' && (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <TextField
+                size="small" label={`Width (${ul})`} type="number"
+                value={toDisplay(rawPaperW, u)}
+                onChange={(e) => onSettingsChange({ paperWidthMm: toMm(parseFloat(e.target.value) || 0, u) || 210 })}
+                inputProps={{ min: toDisplay(50, u), max: toDisplay(2000, u), step }}
+                sx={{ flex: 1 }}
+              />
+              <TextField
+                size="small" label={`Height (${ul})`} type="number"
+                value={toDisplay(rawPaperH, u)}
+                onChange={(e) => onSettingsChange({ paperHeightMm: toMm(parseFloat(e.target.value) || 0, u) || 297 })}
+                inputProps={{ min: toDisplay(50, u), max: toDisplay(2000, u), step }}
+                sx={{ flex: 1 }}
+              />
+            </Box>
+          )}
+        </Box>
       </Box>
 
-      {/* ── Paper orientation ── */}
+      {/* Row 2: Paper orientation */}
       <Box>
         <Typography variant="subtitle2" gutterBottom>Paper orientation</Typography>
         <ToggleButtonGroup
           size="small"
           exclusive
-          fullWidth
           value={paperOrientation}
           onChange={(_, v) => { if (v) onSettingsChange({ paperOrientation: v }); }}
         >
@@ -267,24 +266,22 @@ export default function PrintSettingsComponent({
         )}
       </Box>
 
-      {/* ── Margins + layout summary ── */}
-      <Box>
-        <Box sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
-          <TextField
-            size="small" label={`Page margin (${ul})`} type="number"
-            value={toDisplay(margin, u)}
-            onChange={(e) => onSettingsChange({ pageMarginMm: toMm(parseFloat(e.target.value) || 0, u) })}
-            inputProps={{ min: 0, max: toDisplay(50, u), step }}
-            sx={{ flex: 1 }}
-          />
-          <TextField
-            size="small" label={`Card gap (${ul})`} type="number"
-            value={toDisplay(gap, u)}
-            onChange={(e) => onSettingsChange({ cardGapMm: toMm(parseFloat(e.target.value) || 0, u) })}
-            inputProps={{ min: 0, max: toDisplay(50, u), step }}
-            sx={{ flex: 1 }}
-          />
-        </Box>
+      {/* Row 3: Margin + Gap + summary */}
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <TextField
+          size="small" label={`Page margin (${ul})`} type="number"
+          value={toDisplay(margin, u)}
+          onChange={(e) => onSettingsChange({ pageMarginMm: toMm(parseFloat(e.target.value) || 0, u) })}
+          inputProps={{ min: 0, max: toDisplay(50, u), step }}
+          sx={{ width: 160 }}
+        />
+        <TextField
+          size="small" label={`Card gap (${ul})`} type="number"
+          value={toDisplay(gap, u)}
+          onChange={(e) => onSettingsChange({ cardGapMm: toMm(parseFloat(e.target.value) || 0, u) })}
+          inputProps={{ min: 0, max: toDisplay(50, u), step }}
+          sx={{ width: 160 }}
+        />
         {layoutSummary && (
           <Typography variant="caption" color="text.secondary">
             {layoutSummary.cols} × {layoutSummary.rows} = {layoutSummary.perPage} card
@@ -293,47 +290,43 @@ export default function PrintSettingsComponent({
         )}
       </Box>
 
-      {/* ── Card size ── */}
+      {/* Row 4: Card size */}
       <Box>
-        <Typography variant="subtitle2">Card size ({ul})</Typography>
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-          Each card is printed at these exact dimensions.
-        </Typography>
-      </Box>
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        <TextField
-          size="small" label="Width" type="number"
-          value={toDisplay(settings.widthMm, u)}
-          onChange={(e) => onSettingsChange({ widthMm: toMm(parseFloat(e.target.value) || 0, u) || 85.6 })}
-          inputProps={{ min: toDisplay(10, u), max: toDisplay(500, u), step }}
-          sx={{ flex: 1 }}
-        />
-        <TextField
-          size="small" label="Height" type="number"
-          value={toDisplay(settings.heightMm, u)}
-          onChange={(e) => onSettingsChange({ heightMm: toMm(parseFloat(e.target.value) || 0, u) || 53.98 })}
-          inputProps={{ min: toDisplay(10, u), max: toDisplay(500, u), step }}
-          sx={{ flex: 1 }}
-        />
+        <Typography variant="subtitle2" gutterBottom>Card size ({ul})</Typography>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <TextField
+            size="small" label="Width" type="number"
+            value={toDisplay(settings.widthMm, u)}
+            onChange={(e) => onSettingsChange({ widthMm: toMm(parseFloat(e.target.value) || 0, u) || 85.6 })}
+            inputProps={{ min: toDisplay(10, u), max: toDisplay(500, u), step }}
+            sx={{ width: 160 }}
+          />
+          <TextField
+            size="small" label="Height" type="number"
+            value={toDisplay(settings.heightMm, u)}
+            onChange={(e) => onSettingsChange({ heightMm: toMm(parseFloat(e.target.value) || 0, u) || 53.98 })}
+            inputProps={{ min: toDisplay(10, u), max: toDisplay(500, u), step }}
+            sx={{ width: 160 }}
+          />
+          {showOrientation && (
+            <FormControl size="small" sx={{ width: 180 }}>
+              <InputLabel>Card orientation</InputLabel>
+              <Select
+                value={settings.orientation}
+                label="Card orientation"
+                onChange={(e) =>
+                  onSettingsChange({ orientation: e.target.value as 'portrait' | 'landscape' })
+                }
+              >
+                <MenuItem value="portrait">Portrait</MenuItem>
+                <MenuItem value="landscape">Landscape</MenuItem>
+              </Select>
+            </FormControl>
+          )}
+        </Box>
       </Box>
 
-      {showOrientation && (
-        <FormControl fullWidth size="small">
-          <InputLabel>Card orientation</InputLabel>
-          <Select
-            value={settings.orientation}
-            label="Card orientation"
-            onChange={(e) =>
-              onSettingsChange({ orientation: e.target.value as 'portrait' | 'landscape' })
-            }
-          >
-            <MenuItem value="portrait">Portrait</MenuItem>
-            <MenuItem value="landscape">Landscape</MenuItem>
-          </Select>
-        </FormControl>
-      )}
-
-      {/* ── Presets ── */}
+      {/* Row 5: Presets */}
       <Box>
         <Typography variant="caption" color="text.secondary">Presets</Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>

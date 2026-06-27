@@ -278,7 +278,7 @@ export default function PreviewStep() {
 
             <Box sx={{ flex: 1 }} />
 
-            <FormControl size="small" sx={{ minWidth: 150 }}>
+            <FormControl size="small" sx={{ minWidth: 185 }}>
               <InputLabel>Cards per page</InputLabel>
               <Select
                 value={rowsPerPage}

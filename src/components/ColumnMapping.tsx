@@ -14,6 +14,7 @@ interface ColumnMappingProps {
   mapping: ColumnMapping;
   onMappingChange: (mapping: ColumnMapping) => void;
   onGenerate: () => void;
+  onUploadDifferent: () => void;
 }
 
 export default function ColumnMappingComponent({
@@ -22,6 +23,7 @@ export default function ColumnMappingComponent({
   mapping,
   onMappingChange,
   onGenerate,
+  onUploadDifferent,
 }: ColumnMappingProps) {
   const bindings = elements
     .map((e) => e.binding)
@@ -43,7 +45,7 @@ export default function ColumnMappingComponent({
       <Typography variant="subtitle2" gutterBottom>
         Map CSV columns to template fields
       </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 400 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 2 }}>
         {uniqueBindings.map((binding) => (
           <FormControl key={binding} fullWidth size="small">
             <InputLabel>{binding}</InputLabel>
@@ -67,14 +69,18 @@ export default function ColumnMappingComponent({
           </FormControl>
         ))}
       </Box>
-      <Button
-        variant="contained"
-        sx={{ mt: 2 }}
-        onClick={onGenerate}
-        disabled={!uniqueBindings.some((b) => !!mapping[b])}
-      >
-        Generate Cards
-      </Button>
+      <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+        <Button
+          variant="contained"
+          onClick={onGenerate}
+          disabled={!uniqueBindings.some((b) => !!mapping[b])}
+        >
+          Generate Cards
+        </Button>
+        <Button variant="outlined" size="small" onClick={onUploadDifferent}>
+          Upload Different File
+        </Button>
+      </Box>
     </Box>
   );
 }
