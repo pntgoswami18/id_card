@@ -88,6 +88,28 @@ export function computeEffectivePaperDims(
   return { w: shortSide, h: longSide, usedOrientation: 'portrait' };
 }
 
+type MeasurementUnit = 'mm' | 'cm' | 'in';
+
+const UNIT_LABELS: Record<MeasurementUnit, string> = { mm: 'mm', cm: 'cm', in: 'in' };
+
+function toDisplay(mm: number, unit: MeasurementUnit): number {
+  if (unit === 'cm') return Math.round((mm / 10) * 100) / 100;
+  if (unit === 'in') return Math.round((mm / 25.4) * 1000) / 1000;
+  return mm;
+}
+
+function toMm(val: number, unit: MeasurementUnit): number {
+  if (unit === 'cm') return val * 10;
+  if (unit === 'in') return val * 25.4;
+  return val;
+}
+
+function unitStep(unit: MeasurementUnit): number {
+  if (unit === 'cm') return 0.05;
+  if (unit === 'in') return 0.02;
+  return 0.5;
+}
+
 export default function PrintSettingsComponent({
   settings,
   presets,
@@ -97,6 +119,8 @@ export default function PrintSettingsComponent({
   cardWidthMm,
   cardHeightMm,
 }: PrintSettingsProps) {
+  const [unit, setUnit] = useState<MeasurementUnit>('mm');
+
   useEffect(() => {
     onPresetsChange(loadPrintPresets());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,6 +131,10 @@ export default function PrintSettingsComponent({
   const margin    = settings.pageMarginMm  ?? 5;
   const gap       = settings.cardGapMm     ?? 0;
   const paperOrientation = settings.paperOrientation ?? 'auto';
+
+  const u = unit;
+  const step = unitStep(u);
+  const ul = UNIT_LABELS[u];
 
   // Local state so selecting "Custom" immediately reveals the input fields,
   // even before the user has changed the dimension values.
@@ -163,6 +191,21 @@ export default function PrintSettingsComponent({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* ── Unit selector ── */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography variant="subtitle2" sx={{ flexShrink: 0 }}>Units</Typography>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={unit}
+          onChange={(_, v) => { if (v) setUnit(v); }}
+        >
+          <ToggleButton value="mm">mm</ToggleButton>
+          <ToggleButton value="cm">cm</ToggleButton>
+          <ToggleButton value="in">in</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
       {/* ── Paper size ── */}
       <Box>
         <Typography variant="subtitle2" gutterBottom>Paper size</Typography>
@@ -182,17 +225,17 @@ export default function PrintSettingsComponent({
         {sizeId === 'custom' && (
           <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
             <TextField
-              size="small" label="Paper width (mm)" type="number"
-              value={rawPaperW}
-              onChange={(e) => onSettingsChange({ paperWidthMm: parseFloat(e.target.value) || 210 })}
-              inputProps={{ min: 50, max: 2000, step: 0.5 }}
+              size="small" label={`Paper width (${ul})`} type="number"
+              value={toDisplay(rawPaperW, u)}
+              onChange={(e) => onSettingsChange({ paperWidthMm: toMm(parseFloat(e.target.value) || 0, u) || 210 })}
+              inputProps={{ min: toDisplay(50, u), max: toDisplay(2000, u), step }}
               sx={{ flex: 1 }}
             />
             <TextField
-              size="small" label="Paper height (mm)" type="number"
-              value={rawPaperH}
-              onChange={(e) => onSettingsChange({ paperHeightMm: parseFloat(e.target.value) || 297 })}
-              inputProps={{ min: 50, max: 2000, step: 0.5 }}
+              size="small" label={`Paper height (${ul})`} type="number"
+              value={toDisplay(rawPaperH, u)}
+              onChange={(e) => onSettingsChange({ paperHeightMm: toMm(parseFloat(e.target.value) || 0, u) || 297 })}
+              inputProps={{ min: toDisplay(50, u), max: toDisplay(2000, u), step }}
               sx={{ flex: 1 }}
             />
           </Box>
@@ -224,17 +267,17 @@ export default function PrintSettingsComponent({
       <Box>
         <Box sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
           <TextField
-            size="small" label="Page margin (mm)" type="number"
-            value={margin}
-            onChange={(e) => onSettingsChange({ pageMarginMm: parseFloat(e.target.value) || 0 })}
-            inputProps={{ min: 0, max: 50, step: 0.5 }}
+            size="small" label={`Page margin (${ul})`} type="number"
+            value={toDisplay(margin, u)}
+            onChange={(e) => onSettingsChange({ pageMarginMm: toMm(parseFloat(e.target.value) || 0, u) })}
+            inputProps={{ min: 0, max: toDisplay(50, u), step }}
             sx={{ flex: 1 }}
           />
           <TextField
-            size="small" label="Card gap (mm)" type="number"
-            value={gap}
-            onChange={(e) => onSettingsChange({ cardGapMm: parseFloat(e.target.value) || 0 })}
-            inputProps={{ min: 0, max: 50, step: 0.5 }}
+            size="small" label={`Card gap (${ul})`} type="number"
+            value={toDisplay(gap, u)}
+            onChange={(e) => onSettingsChange({ cardGapMm: toMm(parseFloat(e.target.value) || 0, u) })}
+            inputProps={{ min: 0, max: toDisplay(50, u), step }}
             sx={{ flex: 1 }}
           />
         </Box>
@@ -248,7 +291,7 @@ export default function PrintSettingsComponent({
 
       {/* ── Card size ── */}
       <Box>
-        <Typography variant="subtitle2">Card size (mm)</Typography>
+        <Typography variant="subtitle2">Card size ({ul})</Typography>
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
           Each card is printed at these exact dimensions.
         </Typography>
@@ -256,16 +299,16 @@ export default function PrintSettingsComponent({
       <Box sx={{ display: 'flex', gap: 1 }}>
         <TextField
           size="small" label="Width" type="number"
-          value={settings.widthMm}
-          onChange={(e) => onSettingsChange({ widthMm: parseFloat(e.target.value) || 85.6 })}
-          inputProps={{ min: 10, max: 500, step: 0.1 }}
+          value={toDisplay(settings.widthMm, u)}
+          onChange={(e) => onSettingsChange({ widthMm: toMm(parseFloat(e.target.value) || 0, u) || 85.6 })}
+          inputProps={{ min: toDisplay(10, u), max: toDisplay(500, u), step }}
           sx={{ flex: 1 }}
         />
         <TextField
           size="small" label="Height" type="number"
-          value={settings.heightMm}
-          onChange={(e) => onSettingsChange({ heightMm: parseFloat(e.target.value) || 53.98 })}
-          inputProps={{ min: 10, max: 500, step: 0.1 }}
+          value={toDisplay(settings.heightMm, u)}
+          onChange={(e) => onSettingsChange({ heightMm: toMm(parseFloat(e.target.value) || 0, u) || 53.98 })}
+          inputProps={{ min: toDisplay(10, u), max: toDisplay(500, u), step }}
           sx={{ flex: 1 }}
         />
       </Box>
