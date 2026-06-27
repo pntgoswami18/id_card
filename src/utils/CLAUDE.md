@@ -64,3 +64,7 @@ html2canvas ignores the `scale` parameter when rendering CSS `background-image` 
 ## Workspace hierarchy
 
 Sub-workspaces are max one level deep (enforced in `createSubWorkspace`). `WorkspaceMeta.parentId` marks children. Use `deleteWorkspaceTree(id)` to delete a root workspace and all its children atomically; `deleteWorkspace(id)` only deletes one entry and leaves orphaned children.
+
+## getWorkspaceList — empty fallback on first launch
+
+`getWorkspaceList()` returns `{ currentId: '', workspaces: [] }` when `LIST_KEY` is absent from localStorage or when the stored list has no workspaces. It does **not** synthesise a ghost `{ id: 'default', name: 'Default' }` entry. All callers must handle an empty `workspaces` array. The app shows the first-launch setup modal when the list is empty; `deleteWorkspace`/`deleteWorkspaceTree` still write a `'default'` fallback when the last workspace is deleted (pre-existing behaviour, separate concern).
