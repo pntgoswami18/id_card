@@ -4,7 +4,7 @@
 
 - **DesignStep.tsx** — Step 1: card canvas (`CardCanvas` in `designMode=true`) + toolbar (add elements, template picker, background/watermark panel, save template menu).
 - **DataStep.tsx** — Step 2: CSV file upload + column→binding mapping; dispatches `SET_CSV_DATA`, `SET_COLUMN_MAPPING`, and `SET_RECORDS`.
-- **PreviewStep.tsx** — Step 3: paginated, searchable grid of rendered cards with per-card edit, webcam photo capture, and image crop.
+- **PreviewStep.tsx** — Step 3: paginated, searchable grid of rendered cards with per-card edit, webcam photo capture, image crop, and bulk photo assignment from a folder. The "Bulk add photos" button (hidden when no image binding exists on the template) opens a folder picker via a hidden `<input webkitdirectory>`; images are read in parallel with `Promise.all`/`FileReader` and handed to `BulkPhotoModal`.
 - **PrintStep.tsx** — Step 4: print settings, live print preview, and image export (PNG/PDF). Imports `computeLayout` and `computeEffectivePaperDims` from `PrintSettings.tsx`.
 
 ## Sub-components
@@ -16,6 +16,7 @@
 - **ColumnMapping.tsx** — Pure UI: maps CSV headers to template element bindings via dropdowns; used inside DataStep.
 - **CsvUpload.tsx** — File input wrapper that parses CSV and calls `onParsed`; used inside DataStep.
 - **ImageCropDialog.tsx** — Custom drag-handle crop dialog (no third-party library); used in PreviewStep after webcam capture or image upload.
+- **BulkPhotoModal.tsx** — Modal for assigning photos to cards in bulk. Receives an already-read `photos` array (`{ name, dataUrl }[]`), shows them in a sortable (A→Z / Z→A toggle) and drag-reorderable list, then calls `onConfirm(orderedPhotos)`. Drag reordering clears the active sort direction (`sortDir → null`) so sort buttons are unselected after a manual drag, enabling them to fire `onChange` again. Uses HTML5 native drag API — no DnD library.
 - **PreviewGrid.tsx** — Responsive grid of `CardCanvas` previews with checkboxes for selection; receives `recordGlobalIndices` when rendering a filtered subset so selection indices stay correct.
 - **PrintSettings.tsx** — Print settings form (paper size, margins, orientation, presets). Also exports `computeLayout` and `computeEffectivePaperDims` — import these from here, not from a utils file.
 - **PrintView.tsx** — Stateless print layout: renders pages of cards using `computeLayout`; consumed by PrintStep for the print dialog and image export.
