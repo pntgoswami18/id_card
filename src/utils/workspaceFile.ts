@@ -9,6 +9,7 @@ interface FSWritable {
 export interface WorkspaceFileHandle {
   createWritable(): Promise<FSWritable>;
 }
+type FSAFileHandle = WorkspaceFileHandle & { getFile(): Promise<File> };
 type SavePickerOpts = {
   suggestedName?: string;
   types?: { description?: string; accept: Record<string, string[]> }[];
@@ -19,7 +20,7 @@ type OpenPickerOpts = {
 };
 type WindowWithFSA = Window & {
   showSaveFilePicker?: (opts?: SavePickerOpts) => Promise<WorkspaceFileHandle>;
-  showOpenFilePicker?: (opts?: OpenPickerOpts) => Promise<Array<{ getFile(): Promise<File> }>>;
+  showOpenFilePicker?: (opts?: OpenPickerOpts) => Promise<FSAFileHandle[]>;
 };
 
 // ---- Workspace file format ----
@@ -102,8 +103,11 @@ export async function writeWorkspaceToHandle(
 ): Promise<boolean> {
   try {
     const writable = await handle.createWritable();
-    await writable.write(buildFileContent(name, data, children));
-    await writable.close();
+    try {
+      await writable.write(buildFileContent(name, data, children));
+    } finally {
+      await writable.close();
+    }
     return true;
   } catch {
     return false;
@@ -185,6 +189,15 @@ export async function openWorkspaceWithPicker(): Promise<WorkspaceFile | null> {
  * themselves and show their own error when the result is null.
  */
 export async function openWorkspaceFilePicker(): Promise<File | null> {
+  const result = await openWorkspaceFilePickerWithHandle();
+  return result ? result.file : null;
+}
+
+/**
+ * Open the OS file picker and return both the raw File and the writable FSA handle.
+ * Returns null if cancelled or the API is unavailable.
+ */
+export async function openWorkspaceFilePickerWithHandle(): Promise<{ file: File; handle: WorkspaceFileHandle } | null> {
   const w = window as WindowWithFSA;
   if (!w.showOpenFilePicker) return null;
   try {
@@ -193,7 +206,8 @@ export async function openWorkspaceFilePicker(): Promise<File | null> {
         { description: 'ID Card Workspace', accept: { 'application/json': ['.idcard', '.json'] } },
       ],
     });
-    return handle.getFile();
+    const file = await handle.getFile();
+    return { file, handle };
   } catch (err) {
     if ((err as DOMException).name !== 'AbortError') console.error('Open workspace failed:', err);
     return null;
@@ -271,8 +285,11 @@ export async function saveTemplateWithPicker(name: string, template: Template): 
       types: [{ description: 'ID Card Template', accept: { 'application/json': ['.idtemplate'] } }],
     });
     const writable = await handle.createWritable();
-    await writable.write(content);
-    await writable.close();
+    try {
+      await writable.write(content);
+    } finally {
+      await writable.close();
+    }
     return true;
   } catch (err) {
     if ((err as DOMException).name !== 'AbortError') console.error('Save template failed:', err);

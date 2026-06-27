@@ -49,7 +49,7 @@ import {
 } from '../utils/workspaceStorage';
 import {
   saveWorkspaceWithPicker,
-  openWorkspaceFilePicker,
+  openWorkspaceFilePickerWithHandle,
   readWorkspaceFile,
   hasOpenFilePicker,
   hasSaveFilePicker,
@@ -88,6 +88,12 @@ export default function WorkspaceSwitcher({
   onSetWorkspaceLogo,
 }: WorkspaceSwitcherProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [hasFileHandle, setHasFileHandle] = useState(false);
+
+  const clearFileHandle = () => {
+    fileHandleRef.current = null;
+    setHasFileHandle(false);
+  };
   // new workspace
   const [newOpen, setNewOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -154,6 +160,7 @@ export default function WorkspaceSwitcher({
   // ---- Switch ----
   const handleSwitch = (id: string) => {
     if (id === currentWorkspaceId) { handleClose(); return; }
+    clearFileHandle();
     onSaveCurrent();
     setCurrentWorkspace(id);
     const list = getWorkspaceList();
@@ -174,6 +181,7 @@ export default function WorkspaceSwitcher({
     const name = newName.trim();
     if (!name) return;
     const logo = newLogo ?? undefined;
+    clearFileHandle();
     onSaveCurrent();
     const meta = createWorkspace(name, logo);
     const list = getWorkspaceList();
@@ -198,6 +206,7 @@ export default function WorkspaceSwitcher({
     const name = newSubName.trim();
     if (!name || !newSubParentId) return;
     const logo = newSubLogo ?? undefined;
+    clearFileHandle();
     onSaveCurrent();
     const meta = createSubWorkspace(name, newSubParentId, logo);
     const list = getWorkspaceList();
@@ -249,6 +258,7 @@ export default function WorkspaceSwitcher({
 
   const handleDeleteConfirm = () => {
     if (!currentWorkspaceId) return;
+    clearFileHandle();
     onSaveCurrent();
     deleteWorkspaceTree(currentWorkspaceId);
     const list = getWorkspaceList();
@@ -280,7 +290,10 @@ export default function WorkspaceSwitcher({
       }));
 
       const handle = await saveWorkspaceWithPicker(rootName, rootData, children);
-      if (handle) fileHandleRef.current = handle;
+      if (handle) {
+        fileHandleRef.current = handle;
+        setHasFileHandle(true);
+      }
     } finally {
       setSaving(false);
     }
@@ -341,10 +354,13 @@ export default function WorkspaceSwitcher({
   const handleOpenWorkspace = async () => {
     handleClose();
     if (hasOpenFilePicker()) {
-      const file = await openWorkspaceFilePicker();
-      if (!file) return; // cancelled
-      const wsFile = await readWorkspaceFile(file);
+      const result = await openWorkspaceFilePickerWithHandle();
+      if (!result) return; // cancelled
+      const wsFile = await readWorkspaceFile(result.file);
       if (wsFile) {
+        clearFileHandle();
+        fileHandleRef.current = result.handle;
+        setHasFileHandle(true);
         restoreWorkspaceFile(wsFile);
       } else {
         setOpenError('Invalid workspace file. Please select a valid .idcard file.');
@@ -363,6 +379,9 @@ export default function WorkspaceSwitcher({
       setOpenError('Invalid workspace file. Please select a valid .idcard file.');
       return;
     }
+    // No FSA handle available via <input> — clear any stale handle
+    fileHandleRef.current = null;
+    setHasFileHandle(false);
     restoreWorkspaceFile(wsFile);
   };
 
@@ -376,6 +395,7 @@ export default function WorkspaceSwitcher({
   const handleDupRootConfirm = () => {
     const name = dupRootName.trim();
     if (!name) return;
+    clearFileHandle();
     onSaveCurrent();
     const meta = duplicateWorkspace(currentWorkspaceId, name);
     const list = getWorkspaceList();
@@ -403,6 +423,7 @@ export default function WorkspaceSwitcher({
     const name = dupSubName.trim();
     if (!name || !currentMeta?.parentId) return;
 
+    clearFileHandle();
     onSaveCurrent();
 
     let targetParentId = currentMeta.parentId;
@@ -581,7 +602,7 @@ export default function WorkspaceSwitcher({
               secondary={
                 !hasSaveFilePicker()
                   ? 'Downloads as .idcard file'
-                  : fileHandleRef.current
+                  : hasFileHandle
                   ? 'Overwrite saved file'
                   : 'Choose save location'
               }
@@ -597,20 +618,22 @@ export default function WorkspaceSwitcher({
             <MenuItem
               onClick={() => onAutoSaveToFileChange(!autoSaveToFile)}
               dense
+              disabled={!hasFileHandle}
               sx={{ pl: 1 }}
             >
               <Switch
                 size="small"
-                checked={autoSaveToFile}
+                checked={autoSaveToFile && hasFileHandle}
+                disabled={!hasFileHandle}
                 onChange={(e) => { e.stopPropagation(); onAutoSaveToFileChange(e.target.checked); }}
                 sx={{ mr: 1 }}
               />
               <ListItemText
                 primary="Autosave"
                 secondary={
-                  fileHandleRef.current
+                  hasFileHandle
                     ? 'Saves to file on every change'
-                    : 'Save workspace first to enable'
+                    : 'Save or open a workspace file first'
                 }
               />
             </MenuItem>

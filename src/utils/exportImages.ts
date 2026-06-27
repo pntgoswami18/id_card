@@ -171,10 +171,40 @@ export async function exportCardsAsImages(
     .replace(/[^a-z0-9_\-]/gi, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '');
+  const fileName = `${safeName || 'cards'}-export.zip`;
+
+  type SavePickerOpts = {
+    suggestedName?: string;
+    types?: { description?: string; accept: Record<string, string[]> }[];
+  };
+  type FSWritable = { write(data: BufferSource | Blob | string): Promise<void>; close(): Promise<void> };
+  type FSFileHandle = { createWritable(): Promise<FSWritable> };
+  const win = window as Window & { showSaveFilePicker?: (opts?: SavePickerOpts) => Promise<FSFileHandle> };
+
+  if (win.showSaveFilePicker) {
+    try {
+      const fileHandle = await win.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [{ description: 'ZIP Archive', accept: { 'application/zip': ['.zip'] } }],
+      });
+      const writable = await fileHandle.createWritable();
+      try {
+        await writable.write(zipBlob);
+      } finally {
+        await writable.close();
+      }
+      return;
+    } catch (err) {
+      // User cancelled the picker — abort silently
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      // Fall through to legacy download on other errors
+    }
+  }
+
   const url = URL.createObjectURL(zipBlob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${safeName || 'cards'}-export.zip`;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
