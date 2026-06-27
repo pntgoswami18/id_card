@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -8,7 +8,8 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import InputAdornment from '@mui/material/InputAdornment';
-import type { CardRecord } from '../types';
+import CardCanvas from './CardCanvas';
+import type { CardRecord, Template } from '../types';
 
 interface BindingDef {
   elementId: string;
@@ -25,6 +26,8 @@ interface CardEditDialogProps {
   onTakePhoto: () => void;
   onPhotoReady: (dataUrl: string, name: string) => void;
   photoDisplayNames: Record<string, string>;
+  template: Template;
+  printSettings: { widthMm: number; heightMm: number; orientation: 'portrait' | 'landscape' };
 }
 
 function getValue(record: CardRecord | null, binding: string): string {
@@ -32,6 +35,9 @@ function getValue(record: CardRecord | null, binding: string): string {
   const v = record.overrides[binding] ?? record.data[binding];
   return v ?? '';
 }
+
+const MM_TO_PX = 3.7795275591;
+const PREVIEW_MAX_WIDTH = 420;
 
 export default function CardEditDialog({
   open,
@@ -42,10 +48,27 @@ export default function CardEditDialog({
   onTakePhoto,
   onPhotoReady,
   photoDisplayNames,
+  template,
+  printSettings,
 }: CardEditDialogProps) {
   const [values, setValues] = useState<Record<string, string>>({});
   // null = no override (auto-fit); number = fixed size in pt
   const [fontSizes, setFontSizes] = useState<Record<string, number | null>>({});
+
+  const wMm = printSettings.orientation === 'portrait' ? printSettings.heightMm : printSettings.widthMm;
+  const hMm = printSettings.orientation === 'portrait' ? printSettings.widthMm : printSettings.heightMm;
+  const canvasWidthPx = wMm * MM_TO_PX;
+  const canvasHeightPx = hMm * MM_TO_PX;
+  const previewWidth = Math.min(PREVIEW_MAX_WIDTH, canvasWidthPx);
+  const scale = previewWidth / canvasWidthPx;
+  const previewHeight = canvasHeightPx * scale;
+
+  const previewRecord = useMemo<CardRecord>(() => ({
+    id: record?.id ?? '__preview__',
+    data: record?.data ?? {},
+    overrides: values,
+    fontSizeOverrides: fontSizes as Record<string, number>,
+  }), [record, values, fontSizes]);
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -114,10 +137,58 @@ export default function CardEditDialog({
   const hasTextBindings = textBindings.length > 0;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>Edit Card</DialogTitle>
       <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+        <Box sx={{ display: 'flex', gap: 3, pt: 1, alignItems: 'flex-start' }}>
+          {/* Live card preview */}
+          <Box
+            sx={{
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 1,
+            }}
+          >
+            <Box
+              sx={{
+                width: previewWidth,
+                height: previewHeight,
+                position: 'relative',
+                overflow: 'hidden',
+                borderRadius: 1,
+                boxShadow: 3,
+                flexShrink: 0,
+              }}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: canvasWidthPx,
+                  height: canvasHeightPx,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                <CardCanvas
+                  template={template}
+                  record={previewRecord}
+                  widthMm={wMm}
+                  heightMm={hMm}
+                  designMode={false}
+                />
+              </Box>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              Live preview
+            </Typography>
+          </Box>
+
+          {/* Form fields */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
           {bindings.map(({ binding, isImage }) => {
             const value = values[binding] ?? '';
             if (isImage) {
@@ -216,6 +287,7 @@ export default function CardEditDialog({
               />
             </Button>
           </Box>
+        </Box>
         </Box>
       </DialogContent>
       <DialogActions>

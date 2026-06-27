@@ -379,6 +379,8 @@ export default function PreviewStep() {
         onTakePhoto={handleTakePhotoFromDialog}
         onPhotoReady={handlePhotoReady}
         photoDisplayNames={editIndex != null ? (photoDisplayNames[editIndex] ?? {}) : {}}
+        template={template}
+        printSettings={printSettings}
       />
 
       <WebcamCapture
