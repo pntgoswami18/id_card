@@ -30,6 +30,7 @@ class StepErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
 import theme from './theme';
 import { AppStateProvider, useAppState, useAppDispatch } from './store/AppStateContext';
 import {
+  LIST_KEY,
   getWorkspaceList,
   getWorkspaceData,
   saveWorkspaceData,
@@ -58,6 +59,7 @@ function AppContent() {
   const skipAutoSaveRef = useRef(true);
   const fileHandleRef = useRef<WorkspaceFileHandle | null>(null);
   const [autoSaveToFile, setAutoSaveToFile] = useState(() => getAutoSavePref());
+  const [needsSetup, setNeedsSetup] = useState(() => localStorage.getItem(LIST_KEY) === null);
 
   useEffect(() => {
     if (hydratedRef.current) return;
@@ -206,6 +208,8 @@ function AppContent() {
             onSetCurrentWorkspace={handleSetCurrentWorkspace}
             onSetWorkspaceList={handleSetWorkspaceList}
             onSetWorkspaceLogo={handleSetWorkspaceLogo}
+            needsSetup={needsSetup}
+            onSetupDone={() => setNeedsSetup(false)}
           />
         </Box>
         <Stepper

@@ -72,6 +72,8 @@ interface WorkspaceSwitcherProps {
   onSetCurrentWorkspace: (id: string) => void;
   onSetWorkspaceList: (list: WorkspaceMeta[]) => void;
   onSetWorkspaceLogo: (logo: string | undefined) => void;
+  needsSetup?: boolean;
+  onSetupDone?: () => void;
 }
 
 export default function WorkspaceSwitcher({
@@ -87,9 +89,12 @@ export default function WorkspaceSwitcher({
   onSetCurrentWorkspace,
   onSetWorkspaceList,
   onSetWorkspaceLogo,
+  needsSetup,
+  onSetupDone,
 }: WorkspaceSwitcherProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [hasFileHandle, setHasFileHandle] = useState(false);
+  const [setupStep, setSetupStep] = useState<'choose' | 'naming'>('choose');
 
   const clearFileHandle = () => {
     fileHandleRef.current = null;
@@ -161,7 +166,14 @@ export default function WorkspaceSwitcher({
   // ---- Switch ----
   const handleSwitch = (id: string) => {
     if (id === currentWorkspaceId) { handleClose(); return; }
-    clearFileHandle();
+    // Only clear the file handle when moving to a different workspace tree.
+    // Switching between a root and its own children keeps the same .idcard
+    // file valid, so autosave should continue without interruption.
+    const targetRootId = workspaceList.find((w) => w.id === id)?.parentId ?? id;
+    const currentRootId = currentMeta?.parentId ?? currentWorkspaceId;
+    if (targetRootId !== currentRootId) {
+      clearFileHandle();
+    }
     onSaveCurrent();
     setCurrentWorkspace(id);
     const list = getWorkspaceList();
@@ -178,20 +190,37 @@ export default function WorkspaceSwitcher({
     setNewName(''); setNewLogo(null); setNewOpen(true); handleClose();
   };
 
-  const handleNewWorkspaceConfirm = () => {
+  const handleNewWorkspaceConfirm = async () => {
     const name = newName.trim();
     if (!name) return;
     const logo = newLogo ?? undefined;
+    // Close the name dialog before the OS file picker opens (required for focus/gesture reasons).
+    setNewOpen(false); setNewName(''); setNewLogo(null);
+
     clearFileHandle();
     onSaveCurrent();
+
+    const defaultData = { ...getDefaultWorkspaceData(), logo };
+    const handle = await saveWorkspaceWithPicker(name, defaultData);
+    // On FSA browsers a null handle means the user cancelled — abort workspace creation.
+    // On non-FSA browsers saveWorkspaceWithPicker triggers a download and returns null, so proceed.
+    if (handle === null && hasSaveFilePicker()) {
+      setSetupStep('choose');
+      return;
+    }
+
     const meta = createWorkspace(name, logo);
     const list = getWorkspaceList();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(meta.id);
-    const defaultData = getDefaultWorkspaceData();
-    onLoadWorkspace({ ...defaultData, logo });
-    saveWorkspaceData(meta.id, { ...defaultData, logo });
-    setNewOpen(false); setNewName(''); setNewLogo(null);
+    onLoadWorkspace(defaultData);
+    saveWorkspaceData(meta.id, { ...defaultData, csvData: null });
+    if (handle) {
+      fileHandleRef.current = handle;
+      setHasFileHandle(true);
+    }
+    setSetupStep('choose');
+    onSetupDone?.();
   };
 
   // ---- New sub-workspace ----
@@ -221,6 +250,7 @@ export default function WorkspaceSwitcher({
         template: parentData.template,
         currentTemplateSource: parentData.currentTemplateSource,
         printSettings: parentData.printSettings,
+        printPresets: parentData.printPresets,
       };
     }
     onLoadWorkspace({ ...initialData, logo });
@@ -355,6 +385,7 @@ export default function WorkspaceSwitcher({
     onSetWorkspaceList(newWorkspaces);
     onSetCurrentWorkspace(rootId);
     onLoadWorkspace(wsFile.data);
+    onSetupDone?.();
   };
 
   const handleOpenWorkspace = async () => {
@@ -664,6 +695,82 @@ export default function WorkspaceSwitcher({
           <DialogActions>
             <Button onClick={() => setOpenError(null)}>OK</Button>
           </DialogActions>
+        </Dialog>
+
+        {/* ---- First-launch setup dialog ---- */}
+        <Dialog open={Boolean(needsSetup)} disableEscapeKeyDown maxWidth="sm" fullWidth>
+          {setupStep === 'choose' ? (
+            <>
+              <DialogTitle>Welcome to ID Card Generator</DialogTitle>
+              <DialogContent>
+                <Typography color="text.secondary" sx={{ mb: 3 }}>
+                  Start by creating a new workspace or opening an existing one.
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    startIcon={<Add />}
+                    onClick={() => { setSetupStep('naming'); setNewName(''); setNewLogo(null); }}
+                    fullWidth
+                  >
+                    Create New Workspace
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    startIcon={<FolderOpenOutlined />}
+                    onClick={handleOpenWorkspace}
+                    fullWidth
+                  >
+                    Open Existing Workspace
+                  </Button>
+                </Box>
+              </DialogContent>
+            </>
+          ) : (
+            <>
+              <DialogTitle>New Workspace</DialogTitle>
+              <DialogContent>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  label="Name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleNewWorkspaceConfirm()}
+                  placeholder="e.g. Conference badges"
+                  sx={{ mt: 1, mb: 2 }}
+                />
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Logo (optional)
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {newLogo ? (
+                    <>
+                      <Avatar src={newLogo} sx={{ width: 48, height: 48 }} variant="rounded" />
+                      <Button component="label" size="small" sx={{ minWidth: 0, p: 0, textTransform: 'none', fontSize: '0.8125rem' }}>
+                        Change
+                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={makeLogoHandler(setNewLogo)} />
+                      </Button>
+                      <Button size="small" color="secondary" onClick={() => setNewLogo(null)}>Remove</Button>
+                    </>
+                  ) : (
+                    <Button component="label" variant="outlined" size="small" startIcon={<Image sx={{ fontSize: '1rem' }} />}>
+                      Choose Image
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={makeLogoHandler(setNewLogo)} />
+                    </Button>
+                  )}
+                </Box>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setSetupStep('choose')}>Back</Button>
+                <Button variant="contained" onClick={handleNewWorkspaceConfirm} disabled={!newName.trim()}>
+                  Save to File & Create
+                </Button>
+              </DialogActions>
+            </>
+          )}
         </Dialog>
 
         {/* ---- New workspace dialog ---- */}
