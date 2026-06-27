@@ -10,10 +10,8 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import Divider from '@mui/material/Divider';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileOpenIcon from '@mui/icons-material/FileOpen';
-import { BUILT_IN_TEMPLATES } from '../constants/templates';
 import { loadUserTemplates, deleteUserTemplate, saveUserTemplate } from '../utils/userTemplates';
 import {
   readTemplateFile,
@@ -23,7 +21,7 @@ import type { Template, UserTemplateMeta } from '../types';
 interface TemplatePickerProps {
   open: boolean;
   onClose: () => void;
-  onSelect: (template: Template, source: { type: 'built-in'; id: string } | { type: 'user'; id: string }) => void;
+  onSelect: (template: Template, source: { type: 'user'; id: string }) => void;
   onAfterDelete?: (deletedId: string) => void;
 }
 
@@ -35,11 +33,6 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
   useEffect(() => {
     if (open) setUserTemplates(loadUserTemplates());
   }, [open]);
-
-  const handleSelectBuiltIn = (t: Template) => {
-    onSelect(t, { type: 'built-in', id: t.id });
-    onClose();
-  };
 
   const handleSelectUser = (meta: UserTemplateMeta, template: Template) => {
     onSelect(template, { type: 'user', id: meta.id });
@@ -119,20 +112,9 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
                 </ListItem>
               ))}
             </List>
-            <Divider sx={{ my: 1 }} />
           </>
         )}
 
-        <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
-          Built-in templates
-        </Typography>
-        <List dense>
-          {BUILT_IN_TEMPLATES.map((t) => (
-            <ListItemButton key={t.id} onClick={() => handleSelectBuiltIn(t)}>
-              <ListItemText primary={t.name} secondary={`${t.elements.length} elements`} />
-            </ListItemButton>
-          ))}
-        </List>
       </DialogContent>
 
       <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
