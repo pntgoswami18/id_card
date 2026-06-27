@@ -40,6 +40,12 @@ Apply this same swap anywhere you compute card pixel dimensions. `PreviewGrid` a
 ### WorkspaceSwitcher — Save writes back to opened file
 `handleSaveWorkspace` checks `fileHandleRef.current` before showing the OS save picker. If a handle exists (set when a `.idcard` file was opened or previously saved via FSA), it calls `writeWorkspaceToHandle` directly — no picker is shown. The picker only appears when there is no handle yet (fresh workspace). This means "Save" and autosave both target the same file once a workspace is opened from disk.
 
+### WorkspaceSwitcher — mandatory file picker on new workspace creation
+`handleNewWorkspaceConfirm` is **async**. After closing the name dialog it calls `saveWorkspaceWithPicker` before touching localStorage. On FSA browsers (Chrome/Edge), if the user cancels the picker (`handle === null && hasSaveFilePicker()`), the workspace is **not** created and the function returns early. On non-FSA browsers the fallback download fires and the workspace is created regardless. The acquired handle is stored in `fileHandleRef` so subsequent saves and autosave target the same file without showing the picker again.
+
+### WorkspaceSwitcher — first-launch setup modal
+`WorkspaceSwitcher` accepts `needsSetup?: boolean` and `onSetupDone?: () => void` props. When `needsSetup` is true a blocking `Dialog` (no `onClose`, `disableEscapeKeyDown`) renders over the app with two options: **Create New Workspace** (enters `setupStep='naming'` → name input → calls `handleNewWorkspaceConfirm`) and **Open Existing Workspace** (calls `handleOpenWorkspace`). Both success paths call `onSetupDone?.()` — create via the end of `handleNewWorkspaceConfirm`, open via the end of `restoreWorkspaceFile`. `App.tsx` initialises `needsSetup` with `localStorage.getItem(LIST_KEY) === null` so the modal only appears on the very first load (no workspace list ever written).
+
 ### TemplatePicker patterns
 - **"Import from file" button**: uses `<Button component="label">` wrapping a hidden `<input type="file">`. This is the MUI `component="label"` pattern — do not replace with a `Box component="label"` or a separate click handler.
 - **`importAndSelect()`**: always assigns a fresh id (`user-${Date.now()}`), saves to localStorage via `saveUserTemplate`, reloads local state, calls `onSelect`, then calls `onClose`. Do not skip the id reassignment — it prevents silently overwriting an existing template with the same id.
