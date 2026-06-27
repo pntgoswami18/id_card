@@ -1,4 +1,4 @@
-import { useState, useEffect, useId } from 'react';
+import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -46,8 +46,6 @@ export default function CardEditDialog({
   const [values, setValues] = useState<Record<string, string>>({});
   // null = no override (auto-fit); number = fixed size in pt
   const [fontSizes, setFontSizes] = useState<Record<string, number | null>>({});
-  const photoInputId = useId();
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -204,24 +202,18 @@ export default function CardEditDialog({
             </Typography>
           )}
 
-          <input
-            id={photoInputId}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-          />
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button variant="outlined" fullWidth onClick={onTakePhoto}>
               Take Photo
             </Button>
-            <Button
-              component="label"
-              htmlFor={photoInputId}
-              variant="outlined"
-              fullWidth
-            >
+            <Button component="label" variant="outlined" fullWidth>
               Upload Photo
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleFileChange}
+              />
             </Button>
           </Box>
         </Box>

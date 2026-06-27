@@ -1,4 +1,4 @@
-import { useState, useId, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Tabs from '@mui/material/Tabs';
@@ -33,9 +33,6 @@ export default function BackgroundWatermarkPanel({
   onWatermarkModeEnter,
 }: BackgroundWatermarkPanelProps) {
   const [tab, setTab] = useState(0);
-  const bgInputId = useId();
-  const wmInputId = useId();
-
   useEffect(() => {
     if (tab === 1) onWatermarkModeEnter?.();
   }, [tab, onWatermarkModeEnter]);
@@ -178,31 +175,15 @@ export default function BackgroundWatermarkPanel({
 
           {(background?.type ?? 'solid') === 'image' && (
             <Box sx={{ mt: 1 }}>
-              <input
-                id={bgInputId}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleBackgroundFileChange}
-              />
-              <Box
-                component="label"
-                htmlFor={bgInputId}
-                tabIndex={0}
-                sx={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: '100%', cursor: 'pointer', userSelect: 'none',
-                  px: 2, py: 0.5, mb: 1, borderRadius: 1,
-                  fontSize: '0.8125rem', fontWeight: 500, lineHeight: 1.75,
-                  letterSpacing: '0.02857em', textTransform: 'uppercase',
-                  color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
-                  transition: 'background-color 0.2s',
-                  '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
-                  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
-                }}
-              >
+              <Button component="label" variant="outlined" fullWidth sx={{ mb: 1 }}>
                 Upload Image From Device
-              </Box>
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleBackgroundFileChange}
+                />
+              </Button>
               <TextField
                 fullWidth
                 size="small"
@@ -282,31 +263,15 @@ export default function BackgroundWatermarkPanel({
               )}
               {watermark.type === 'image' && (
                 <Box sx={{ mb: 1 }}>
-                  <input
-                    id={wmInputId}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={handleWatermarkFileChange}
-                  />
-                  <Box
-                    component="label"
-                    htmlFor={wmInputId}
-                    tabIndex={0}
-                    sx={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      width: '100%', cursor: 'pointer', userSelect: 'none',
-                      px: 2, py: 0.5, mb: 1, borderRadius: 1,
-                      fontSize: '0.8125rem', fontWeight: 500, lineHeight: 1.75,
-                      letterSpacing: '0.02857em', textTransform: 'uppercase',
-                      color: 'primary.main', border: '1px solid', borderColor: 'primary.main',
-                      transition: 'background-color 0.2s',
-                      '&:hover': { bgcolor: 'rgba(25,118,210,0.04)' },
-                      '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: '2px' },
-                    }}
-                  >
+                  <Button component="label" variant="outlined" fullWidth sx={{ mb: 1 }}>
                     Upload Image From Device
-                  </Box>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleWatermarkFileChange}
+                    />
+                  </Button>
                   <TextField
                     fullWidth
                     size="small"
