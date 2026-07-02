@@ -222,8 +222,14 @@ function AppContent() {
           activeStep={activeStep}
           sx={{
             pt: 2, pb: 3, flexShrink: 0,
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            rowGap: 1,
+            columnGap: { xs: 0.5, sm: 0 },
             // Remove the default connector line between steps
             '& .MuiStepConnector-line': { borderColor: 'transparent' },
+            // Connectors add flex-basis the compact mobile layout can't spare; collapse them below sm and
+            // replace with a small flex gap so steps don't sit flush against each other.
+            '& .MuiStepConnector-root': { display: { xs: 'none', sm: 'block' } },
           }}
           aria-label="Workflow steps"
         >
@@ -240,14 +246,14 @@ function AppContent() {
                   aria-label={`Go to ${label} step`}
                   sx={{
                     borderRadius: 2,
-                    px: 2,
+                    px: { xs: 1, sm: 2 },
                     py: 1,
                     transition: 'background 0.15s, box-shadow 0.15s',
                     cursor: isDisabled ? 'not-allowed' : 'pointer',
                     ...(isActive && {
                       bgcolor: 'primary.main',
                       boxShadow: 2,
-                      '& .MuiStepLabel-label': { color: 'primary.contrastText', fontWeight: 700 },
+                      '& .MuiStepLabel-label': { color: 'primary.contrastText' },
                       '& .MuiStepIcon-root': { color: 'primary.contrastText' },
                       '& .MuiStepIcon-text': { fill: 'primary.main' },
                     }),
@@ -262,7 +268,8 @@ function AppContent() {
                   <StepLabel
                     sx={{
                       '& .MuiStepLabel-label': {
-                        fontWeight: isActive ? 700 : 500,
+                        fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                        fontWeight: 500,
                         color: isDisabled
                           ? 'text.disabled'
                           : isActive

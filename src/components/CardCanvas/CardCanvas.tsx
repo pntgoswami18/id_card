@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useLayoutEffect } from 'react';
+import { useTheme } from '@mui/material/styles';
 import type { Template, TemplateElement, TextElement, LabelElement, BackgroundConfig, WatermarkConfig, CardRecord } from '../../types';
 
 interface CardCanvasProps {
@@ -406,6 +407,7 @@ export default function CardCanvas({
   watermarkEditMode = false,
   onWatermarkChange,
 }: CardCanvasProps) {
+  const theme = useTheme();
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = containerRefProp ?? internalRef;
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -730,7 +732,7 @@ export default function CardCanvas({
       top,
       width,
       height,
-      border: '2px dashed #6750A4',
+      border: `2px dashed ${theme.palette.primary.main}`,
       backgroundColor: 'rgba(103, 80, 164, 0.1)',
       pointerEvents: 'none',
       boxSizing: 'border-box',
@@ -748,7 +750,7 @@ export default function CardCanvas({
       width: `${el.width}%`,
       height: `${el.height}%`,
       boxSizing: 'border-box',
-      border: elementsEditable ? (isSelected ? '2px solid #6750A4' : '1px dashed #999') : 'none',
+      border: elementsEditable ? (isSelected ? `2px solid ${theme.palette.primary.main}` : '1px dashed #999') : 'none',
       cursor: elementsEditable ? (dragState?.elementId === el.id ? 'grabbing' : 'grab') : 'default',
       userSelect: elementsEditable ? 'none' : 'auto',
     };
@@ -801,7 +803,8 @@ export default function CardCanvas({
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: '#e0e0e0',
-              color: '#666',
+              color: '#595959', // ~5.2:1 on #e0e0e0, meets WCAG AA (4.5:1) for normal text
+
               fontSize: 10,
               pointerEvents: designMode ? 'none' : 'auto',
             }}
@@ -838,7 +841,7 @@ export default function CardCanvas({
                 width: 12,
                 height: 12,
                 cursor: 'nwse-resize',
-                backgroundColor: '#6750A4',
+                backgroundColor: theme.palette.primary.main,
                 border: '1px solid #fff',
                 borderRadius: 2,
                 boxSizing: 'border-box',
@@ -853,7 +856,7 @@ export default function CardCanvas({
                 width: 12,
                 height: 12,
                 cursor: 'nesw-resize',
-                backgroundColor: '#6750A4',
+                backgroundColor: theme.palette.primary.main,
                 border: '1px solid #fff',
                 borderRadius: 2,
                 boxSizing: 'border-box',
@@ -868,7 +871,7 @@ export default function CardCanvas({
                 width: 12,
                 height: 12,
                 cursor: 'nesw-resize',
-                backgroundColor: '#6750A4',
+                backgroundColor: theme.palette.primary.main,
                 border: '1px solid #fff',
                 borderRadius: 2,
                 boxSizing: 'border-box',
@@ -883,7 +886,7 @@ export default function CardCanvas({
                 width: 12,
                 height: 12,
                 cursor: 'nwse-resize',
-                backgroundColor: '#6750A4',
+                backgroundColor: theme.palette.primary.main,
                 border: '1px solid #fff',
                 borderRadius: 2,
                 boxSizing: 'border-box',
@@ -924,7 +927,7 @@ export default function CardCanvas({
               justifyContent: 'center',
               transform: watermark.rotation != null ? `rotate(${watermark.rotation}deg)` : undefined,
               boxSizing: 'border-box',
-              border: '2px solid #6750A4',
+              border: `2px solid ${theme.palette.primary.main}`,
             }}
             onMouseDown={handleWmDragStart}
           >
@@ -948,7 +951,7 @@ export default function CardCanvas({
                   width: 12,
                   height: 12,
                   cursor: handle === 'sw' || handle === 'ne' ? 'nesw-resize' : 'nwse-resize',
-                  backgroundColor: '#6750A4',
+                  backgroundColor: theme.palette.primary.main,
                   border: '1px solid #fff',
                   borderRadius: 2,
                   boxSizing: 'border-box',

@@ -195,107 +195,110 @@ export default function PreviewStep() {
         </Typography>
       ) : (
         <>
-          {/* Controls row: search | actions | cards-per-page */}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
-            <TextField
-              size="small"
-              placeholder="Search cards…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              sx={{ flex: '1 1 200px', maxWidth: 360 }}
-              inputRef={searchInputRef}
-              inputProps={{ 'aria-label': 'Search cards' }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-                endAdornment: searchQuery ? (
-                  <InputAdornment position="end">
-                    <IconButton
-                      size="small"
-                      edge="end"
-                      aria-label="Clear search"
-                      onClick={() => {
-                        setSearchQuery('');
-                        setTimeout(() => searchInputRef.current?.focus(), 0);
-                      }}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </InputAdornment>
-                ) : null,
-              }}
-            />
+          {/* Controls: actions row (search/selection/print) and pagination row wrap independently
+              so a narrow viewport never splits "Cards per page" from its page-count text. */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+              <TextField
+                size="small"
+                placeholder="Search cards…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                sx={{ flex: '1 1 200px', maxWidth: 360 }}
+                inputRef={searchInputRef}
+                inputProps={{ 'aria-label': 'Search cards' }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchQuery ? (
+                    <InputAdornment position="end">
+                      <IconButton
+                        size="small"
+                        edge="end"
+                        aria-label="Clear search"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setTimeout(() => searchInputRef.current?.focus(), 0);
+                        }}
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ) : null,
+                }}
+              />
 
-            {hasImageBinding && (
-              <>
-                <Button size="small" variant="outlined" onClick={() => bulkInputRef.current?.click()}>
-                  Bulk add photos
-                </Button>
-                <input
-                  ref={bulkInputRef}
-                  type="file"
-                  // @ts-expect-error webkitdirectory is not in standard HTMLInputElement types
-                  webkitdirectory=""
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleBulkFolderChange}
-                />
-              </>
-            )}
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => {
-                if (isSearchActive) {
-                  dispatch({ type: 'SET_SELECTED_CARD_INDICES', payload: filteredResults.map((r) => r.globalIndex) });
-                } else {
-                  dispatch({ type: 'SELECT_ALL_CARDS' });
-                }
-              }}
-            >
-              Select {isSearchActive ? 'Matching' : 'All'}
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => dispatch({ type: 'DESELECT_ALL_CARDS' })}
-            >
-              Deselect All
-            </Button>
-            <Typography variant="body2" color="text.secondary">
-              {selectedCardIndices.length} selected
-            </Typography>
-            <Button
-              size="small"
-              variant="contained"
-              onClick={() => dispatch({ type: 'SET_ACTIVE_STEP', payload: 3 })}
-            >
-              Print {selectedCardIndices.length > 0 ? 'Selected' : 'All'}
-            </Button>
-
-            <Box sx={{ flex: 1 }} />
-
-            <FormControl size="small" sx={{ minWidth: 185 }}>
-              <InputLabel>Cards per page</InputLabel>
-              <Select
-                value={rowsPerPage}
-                label="Cards per page"
-                onChange={handleRowsPerPageChange}
+              {hasImageBinding && (
+                <>
+                  <Button size="small" variant="outlined" onClick={() => bulkInputRef.current?.click()}>
+                    Bulk add photos
+                  </Button>
+                  <input
+                    ref={bulkInputRef}
+                    type="file"
+                    // @ts-expect-error webkitdirectory is not in standard HTMLInputElement types
+                    webkitdirectory=""
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleBulkFolderChange}
+                  />
+                </>
+              )}
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  if (isSearchActive) {
+                    dispatch({ type: 'SET_SELECTED_CARD_INDICES', payload: filteredResults.map((r) => r.globalIndex) });
+                  } else {
+                    dispatch({ type: 'SELECT_ALL_CARDS' });
+                  }
+                }}
               >
-                {PAGE_SIZE_OPTIONS.map((n) => (
-                  <MenuItem key={n} value={n}>{n}</MenuItem>
-                ))}
-                {filteredResults.length > Math.max(...PAGE_SIZE_OPTIONS) && (
-                  <MenuItem value={filteredResults.length}>All ({filteredResults.length})</MenuItem>
-                )}
-              </Select>
-            </FormControl>
-            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-              Page {page} of {pageCount} ({filteredResults.length} {isSearchActive ? 'matching' : 'total'})
-            </Typography>
+                Select {isSearchActive ? 'Matching' : 'All'}
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => dispatch({ type: 'DESELECT_ALL_CARDS' })}
+              >
+                Deselect All
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                {selectedCardIndices.length} selected
+              </Typography>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => dispatch({ type: 'SET_ACTIVE_STEP', payload: 3 })}
+              >
+                Print {selectedCardIndices.length > 0 ? 'Selected' : 'All'}
+              </Button>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <FormControl size="small" sx={{ minWidth: 185 }}>
+                <InputLabel>Cards per page</InputLabel>
+                <Select
+                  value={rowsPerPage}
+                  label="Cards per page"
+                  onChange={handleRowsPerPageChange}
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <MenuItem key={n} value={n}>{n}</MenuItem>
+                  ))}
+                  {filteredResults.length > Math.max(...PAGE_SIZE_OPTIONS) && (
+                    <MenuItem value={filteredResults.length}>All ({filteredResults.length})</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+              <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                Page {page} of {pageCount} ({filteredResults.length} {isSearchActive ? 'matching' : 'total'})
+              </Typography>
+            </Box>
           </Box>
 
           {/* Search results banner */}

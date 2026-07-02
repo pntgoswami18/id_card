@@ -197,8 +197,8 @@ export default function PrintSettingsComponent({
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, maxWidth: 620 }}>
       {/* Row 1: Units + Paper size side by side */}
       <Box sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 2, alignItems: 'start' }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          <Typography variant="subtitle2">Units</Typography>
+        <Box component="fieldset" sx={{ border: 0, m: 0, p: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Typography component="legend" variant="subtitle2" sx={{ p: 0 }}>Units</Typography>
           <ToggleButtonGroup
             size="small"
             exclusive
@@ -211,8 +211,8 @@ export default function PrintSettingsComponent({
           </ToggleButtonGroup>
         </Box>
 
-        <Box>
-          <Typography variant="subtitle2" gutterBottom>Paper size</Typography>
+        <Box component="fieldset" sx={{ border: 0, m: 0, p: 0 }}>
+          <Typography component="legend" variant="subtitle2" gutterBottom sx={{ p: 0 }}>Paper size</Typography>
           <FormControl fullWidth size="small" sx={{ mb: 1 }}>
             <InputLabel>Paper size</InputLabel>
             <Select
@@ -247,8 +247,8 @@ export default function PrintSettingsComponent({
       </Box>
 
       {/* Row 2: Paper orientation */}
-      <Box>
-        <Typography variant="subtitle2" gutterBottom>Paper orientation</Typography>
+      <Box component="fieldset" sx={{ border: 0, m: 0, p: 0 }}>
+        <Typography component="legend" variant="subtitle2" gutterBottom sx={{ p: 0 }}>Paper orientation</Typography>
         <ToggleButtonGroup
           size="small"
           exclusive
@@ -291,8 +291,8 @@ export default function PrintSettingsComponent({
       </Box>
 
       {/* Row 4: Card size */}
-      <Box>
-        <Typography variant="subtitle2" gutterBottom>Card size ({ul})</Typography>
+      <Box component="fieldset" sx={{ border: 0, m: 0, p: 0 }}>
+        <Typography component="legend" variant="subtitle2" gutterBottom sx={{ p: 0 }}>Card size ({ul})</Typography>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <TextField
             size="small" label="Width" type="number"

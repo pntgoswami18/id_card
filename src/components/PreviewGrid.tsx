@@ -84,7 +84,8 @@ export default function PreviewGrid({
                 height: previewHeightPx,
                 overflow: 'hidden',
                 flexShrink: 0,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)',
+                // Matches the floating card-preview elevation used in CardEditDialog.
+                boxShadow: 3,
               }}
             >
               <Box
