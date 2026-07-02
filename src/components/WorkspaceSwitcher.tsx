@@ -1,4 +1,4 @@
-import React, { useState, useId, useEffect } from 'react';
+import React, { useState, useId, useEffect, useRef } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
@@ -106,6 +106,15 @@ export default function WorkspaceSwitcher({
   const [newSubLogo, setNewSubLogo] = useState<string | null>(null);
   // Sub-workspaces always inherit the parent's template and print settings
   const [newSubParentId, setNewSubParentId] = useState<string | null>(null);
+  const newSubNameInputRef = useRef<HTMLInputElement>(null);
+
+  // The Dialog's autoFocus races with the closing workspace Menu's own focus
+  // trap teardown, so focus lands on the Dialog container instead of the field.
+  useEffect(() => {
+    if (!newSubOpen) return;
+    const id = requestAnimationFrame(() => newSubNameInputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [newSubOpen]);
   // edit / delete
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -590,6 +599,7 @@ export default function WorkspaceSwitcher({
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
           onClose={handleClose}
+          disableRestoreFocus
           anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
@@ -883,7 +893,7 @@ export default function WorkspaceSwitcher({
           </DialogTitle>
           <DialogContent>
             <TextField
-              autoFocus
+              inputRef={newSubNameInputRef}
               fullWidth
               label="Name"
               value={newSubName}
