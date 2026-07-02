@@ -28,6 +28,9 @@
 ### Step remount
 `App.tsx` wraps each step in `<StepErrorBoundary key={activeStep}>`. **Every step unmounts and remounts on navigation.** Any local state (e.g., `selectedElementIds` in DesignStep, pagination/search in PreviewStep) is intentionally discarded. State that must survive step changes — template, records, csvData, columnMapping, printSettings, etc. — must be in AppState and dispatched via `useAppDispatch`.
 
+### PreviewStep — pagination is derived, not effect-driven
+`page` state is intentionally not clamped via a `useEffect`. `currentPage = Math.min(page, pageCount)` is computed inline every render and used everywhere `page` used to be (`paginatedItems`, the "Page X of Y" text, the `<Pagination>` prop) — this replaces an old `useEffect(() => { if (page > pageCount) setPage(1) }, [page, pageCount])` that tripped the `react-hooks/set-state-in-effect` lint rule. Resetting to page 1 when `searchQuery` changes uses React's documented "adjust state during render" pattern instead (`prevSearchQuery` state compared inline, `setPage(1)` called conditionally in the render body, not inside an effect). Do not reintroduce either as a `useEffect` — both were removed specifically to fix the lint warning without adding an extra render pass.
+
 ### Card orientation dimension swap
 Both DesignStep and PrintStep swap `widthMm`/`heightMm` for portrait orientation:
 ```
