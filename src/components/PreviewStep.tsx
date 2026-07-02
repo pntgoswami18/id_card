@@ -67,14 +67,17 @@ export default function PreviewStep() {
 
   const pageCount = Math.max(1, Math.ceil(filteredResults.length / rowsPerPage));
 
-  useEffect(() => {
-    if (page > pageCount) setPage(1);
-  }, [page, pageCount]);
-
-  // Reset to page 1 whenever search query changes
-  useEffect(() => {
+  // Reset to page 1 whenever the search query changes, computed during render
+  // (React's documented pattern for "adjust state when a value changes")
+  // rather than via a useEffect, so it doesn't cost an extra render+effect pass.
+  const [prevSearchQuery, setPrevSearchQuery] = useState(searchQuery);
+  if (searchQuery !== prevSearchQuery) {
+    setPrevSearchQuery(searchQuery);
     setPage(1);
-  }, [searchQuery]);
+  }
+
+  // Clamp out-of-range pages (e.g. after records shrink) without a separate effect.
+  const currentPage = Math.min(page, pageCount);
 
   // Debounce search query by 150ms for filteredResults computation
   useEffect(() => {
@@ -83,9 +86,9 @@ export default function PreviewStep() {
   }, [searchQuery]);
 
   const paginatedItems = useMemo(() => {
-    const start = (page - 1) * rowsPerPage;
+    const start = (currentPage - 1) * rowsPerPage;
     return filteredResults.slice(start, start + rowsPerPage);
-  }, [filteredResults, page, rowsPerPage]);
+  }, [filteredResults, currentPage, rowsPerPage]);
 
   const { paginatedRecords, paginatedGlobalIndices } = useMemo(() => ({
     paginatedRecords: paginatedItems.map((item) => item.record),
@@ -296,7 +299,7 @@ export default function PreviewStep() {
                 </Select>
               </FormControl>
               <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                Page {page} of {pageCount} ({filteredResults.length} {isSearchActive ? 'matching' : 'total'})
+                Page {currentPage} of {pageCount} ({filteredResults.length} {isSearchActive ? 'matching' : 'total'})
               </Typography>
             </Box>
           </Box>
@@ -352,7 +355,7 @@ export default function PreviewStep() {
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
               <Pagination
                 count={pageCount}
-                page={page}
+                page={currentPage}
                 onChange={handlePageChange}
                 color="primary"
                 showFirstButton
