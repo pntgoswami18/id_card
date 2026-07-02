@@ -86,6 +86,8 @@ export interface Template {
   elements: TemplateElement[];
   background?: BackgroundConfig | null;
   watermark?: WatermarkConfig | null;
+  /** Card orientation this template was designed for. Applied to printSettings when the template is loaded. */
+  orientation?: 'portrait' | 'landscape';
 }
 
 // Record = one row from CSV (after mapping)

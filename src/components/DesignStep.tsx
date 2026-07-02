@@ -52,6 +52,9 @@ export default function DesignStep() {
   const handleSelectTemplate = (t: Template, source: { type: 'built-in'; id: string } | { type: 'user'; id: string }) => {
     dispatch({ type: 'SET_TEMPLATE', payload: { ...t, elements: t.elements.map((e) => ({ ...e, id: generateId() })) } });
     dispatch({ type: 'SET_CURRENT_TEMPLATE_SOURCE', payload: source });
+    if (t.orientation) {
+      dispatch({ type: 'SET_PRINT_SETTINGS', payload: { ...printSettings, orientation: t.orientation } });
+    }
     setSelectedElementIds([]);
   };
 
@@ -206,7 +209,7 @@ export default function DesignStep() {
 
   const handleSave = async () => {
     if (!canSaveOverwrite) return;
-    const toSave: Template = { ...template, id: template.id, name: template.name };
+    const toSave: Template = { ...template, id: template.id, name: template.name, orientation: printSettings.orientation };
     saveUserTemplate(toSave);
     await saveTemplateWithPicker(toSave.name, toSave);
   };
@@ -214,7 +217,7 @@ export default function DesignStep() {
   const handleSaveTemplate = async () => {
     const name = saveTemplateName.trim() || 'My Template';
     const id = `user-${Date.now()}`;
-    const toSave: Template = { ...template, id, name };
+    const toSave: Template = { ...template, id, name, orientation: printSettings.orientation };
     // Always save to localStorage so it appears in TemplatePicker
     saveUserTemplate(toSave);
     // Update both template id and source so subsequent "Save" overwrites the right key
