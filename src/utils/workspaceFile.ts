@@ -6,9 +6,15 @@ interface FSWritable {
   write(data: string): Promise<void>;
   close(): Promise<void>;
 }
+export type FSAPermissionState = 'granted' | 'denied' | 'prompt';
 export interface WorkspaceFileHandle {
   name: string;
   createWritable(): Promise<FSWritable>;
+  // Optional: not present on hand-built mock/stub handles or in older browsers.
+  // Callers must feature-detect with `typeof handle.xxx === 'function'`.
+  queryPermission?(opts?: { mode?: 'read' | 'readwrite' }): Promise<FSAPermissionState>;
+  requestPermission?(opts?: { mode?: 'read' | 'readwrite' }): Promise<FSAPermissionState>;
+  isSameEntry?(other: WorkspaceFileHandle): Promise<boolean>;
 }
 type FSAFileHandle = WorkspaceFileHandle & { getFile(): Promise<File> };
 type SavePickerOpts = {

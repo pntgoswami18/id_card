@@ -43,6 +43,7 @@ import {
   setAutoSavePref,
   type WorkspaceFileHandle,
 } from './utils/workspaceFile';
+import { getAllStoredHandles } from './utils/fileHandleStore';
 import WorkspaceSwitcher from './components/WorkspaceSwitcher';
 
 const DesignStep = lazy(() => import('./components/DesignStep'));
@@ -62,6 +63,9 @@ function AppContent() {
   const currentWorkspaceDataRef = useRef<WorkspaceData | null>(null);
   const [autoSaveToFile, setAutoSaveToFile] = useState(() => getAutoSavePref());
   const [needsSetup, setNeedsSetup] = useState(() => localStorage.getItem(LIST_KEY) === null);
+  // Bumped once IndexedDB-persisted file handles have been rehydrated into fileHandleRef,
+  // so WorkspaceSwitcher's handle-sync effect (which reads a ref, not state) knows to re-check.
+  const [handleRehydrationVersion, setHandleRehydrationVersion] = useState(0);
 
   useEffect(() => {
     if (hydratedRef.current) return;
@@ -73,6 +77,16 @@ function AppContent() {
     if (data) {
       dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: { ...data, logo: data.logo } });
     }
+
+    // Best-effort: repopulate the in-memory handle map from IndexedDB so links established
+    // in a previous session (before this page load) can silently resume autosave.
+    void (async () => {
+      const stored = await getAllStoredHandles();
+      for (const [rootId, handle] of stored.entries()) {
+        fileHandleRef.current.set(rootId, handle);
+      }
+      setHandleRehydrationVersion((v) => v + 1);
+    })();
   }, [dispatch]);
 
   const currentWorkspaceName = workspaceList.find((w) => w.id === currentWorkspaceId)?.name ?? 'Workspace';
@@ -209,6 +223,7 @@ function AppContent() {
             autoSaveToFile={autoSaveToFile}
             onAutoSaveToFileChange={(v) => { setAutoSaveToFile(v); setAutoSavePref(v); }}
             fileHandleRef={fileHandleRef}
+            handleRehydrationTick={handleRehydrationVersion}
             onSaveCurrent={handleSaveCurrent}
             onLoadWorkspace={handleLoadWorkspace}
             onSetCurrentWorkspace={handleSetCurrentWorkspace}

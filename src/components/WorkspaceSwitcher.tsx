@@ -14,6 +14,8 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Switch from '@mui/material/Switch';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
@@ -56,6 +58,7 @@ import {
   hasSaveFilePicker,
   type WorkspaceFileHandle,
 } from '../utils/workspaceFile';
+import { setStoredHandle, deleteStoredHandle, getAllStoredHandles } from '../utils/fileHandleStore';
 import { readFileAsDataUrl } from '../utils/file';
 import { loadUserTemplates, saveUserTemplate } from '../utils/userTemplates';
 
@@ -66,6 +69,8 @@ interface WorkspaceSwitcherProps {
   autoSaveToFile: boolean;
   onAutoSaveToFileChange: (v: boolean) => void;
   fileHandleRef: React.MutableRefObject<Map<string, WorkspaceFileHandle>>;
+  /** Bumped by App.tsx after async-rehydrating fileHandleRef from IndexedDB, so the handle-sync effect re-runs. */
+  handleRehydrationTick: number;
   onSaveCurrent: (overrides?: Partial<WorkspaceData>) => void;
   onLoadWorkspace: (data: WorkspaceData) => void;
   onSetCurrentWorkspace: (id: string) => void;
@@ -82,6 +87,7 @@ export default function WorkspaceSwitcher({
   autoSaveToFile,
   onAutoSaveToFileChange,
   fileHandleRef,
+  handleRehydrationTick,
   onSaveCurrent,
   onLoadWorkspace,
   onSetCurrentWorkspace,
@@ -93,6 +99,11 @@ export default function WorkspaceSwitcher({
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [hasFileHandle, setHasFileHandle] = useState(false);
   const [savedFileName, setSavedFileName] = useState<string | null>(null);
+  // 'unknown' until queryPermission resolves; 'needs-reconnect' means the browser dropped
+  // write access (typically after a reload) and a user-gesture requestPermission() is required.
+  const [permissionState, setPermissionState] = useState<'granted' | 'needs-reconnect' | 'unknown'>('unknown');
+  const [reconnectError, setReconnectError] = useState<'not-found' | 'denied' | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [pendingSwitchId, setPendingSwitchId] = useState<string | null>(null);
   const [setupStep, setSetupStep] = useState<'choose' | 'naming'>('choose');
 
@@ -144,13 +155,79 @@ export default function WorkspaceSwitcher({
   // Root id for the currently active workspace (sub-workspaces share their parent's root).
   const currentRootId = currentMeta?.parentId ?? currentWorkspaceId;
 
-  // Sync hasFileHandle / savedFileName from the map whenever the active workspace changes.
+  // Sync hasFileHandle / savedFileName / permissionState from the map whenever the active
+  // workspace changes, or whenever App.tsx finishes rehydrating handles from IndexedDB
+  // (handleRehydrationTick). Freshly-acquired handles (same session) have no queryPermission
+  // gap and are treated as 'granted'; rehydrated ones need an explicit permission check since
+  // the browser may require a fresh user gesture to re-grant write access.
   useEffect(() => {
     const handle = fileHandleRef.current.get(currentRootId);
     setHasFileHandle(!!handle);
     setSavedFileName(handle?.name ?? null);
+    setReconnectError(null);
+    setBannerDismissed(false);
+    if (!handle) { setPermissionState('unknown'); return; }
+    if (typeof handle.queryPermission !== 'function') { setPermissionState('granted'); return; }
+    let cancelled = false;
+    void handle.queryPermission({ mode: 'readwrite' }).then((state) => {
+      if (!cancelled) setPermissionState(state === 'granted' ? 'granted' : 'needs-reconnect');
+    }).catch(() => { if (!cancelled) setPermissionState('needs-reconnect'); });
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentWorkspaceId]);
+  }, [currentWorkspaceId, handleRehydrationTick]);
+
+  const handleReconnect = async () => {
+    const handle = fileHandleRef.current.get(currentRootId);
+    if (!handle || typeof handle.requestPermission !== 'function') return;
+    try {
+      const state = await handle.requestPermission({ mode: 'readwrite' });
+      if (state === 'granted') {
+        setPermissionState('granted');
+        setReconnectError(null);
+        // requestPermission alone doesn't guarantee the file is still reachable on disk.
+        const fsaHandle = handle as WorkspaceFileHandle & { getFile?: () => Promise<File> };
+        if (typeof fsaHandle.getFile === 'function') {
+          await fsaHandle.getFile();
+        }
+      } else {
+        setReconnectError('denied');
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'NotFoundError') {
+        setReconnectError('not-found');
+      } else {
+        setReconnectError('denied');
+      }
+    }
+  };
+
+  // requestPermission() can only be called as a result of a real user gesture — the File
+  // System Access API has no fully-silent way to re-arm write access after a reload, by
+  // design. The closest thing to "automatic": attempt reconnect on the user's first
+  // click/keypress anywhere in the app rather than making them find a "Reconnect" button.
+  // If the browser already remembers a standing grant, this resolves with no visible
+  // prompt at all. Fires at most once per reconnect episode (per workspace switch / rehydration).
+  const permissionStateRef = useRef(permissionState);
+  permissionStateRef.current = permissionState;
+  const handleReconnectRef = useRef(handleReconnect);
+  handleReconnectRef.current = handleReconnect;
+
+  useEffect(() => {
+    let attempted = false;
+    const tryReconnect = () => {
+      if (attempted || permissionStateRef.current !== 'needs-reconnect') return;
+      attempted = true;
+      document.removeEventListener('click', tryReconnect, true);
+      document.removeEventListener('keydown', tryReconnect, true);
+      void handleReconnectRef.current();
+    };
+    document.addEventListener('click', tryReconnect, true);
+    document.addEventListener('keydown', tryReconnect, true);
+    return () => {
+      document.removeEventListener('click', tryReconnect, true);
+      document.removeEventListener('keydown', tryReconnect, true);
+    };
+  }, [currentWorkspaceId, handleRehydrationTick]);
 
   const setHandleForRoot = (rootId: string, handle: WorkspaceFileHandle) => {
     fileHandleRef.current.set(rootId, handle);
@@ -158,6 +235,7 @@ export default function WorkspaceSwitcher({
       setHasFileHandle(true);
       setSavedFileName(handle.name);
     }
+    void setStoredHandle(rootId, handle);
   };
 
   const clearHandleForRoot = (rootId: string) => {
@@ -166,6 +244,7 @@ export default function WorkspaceSwitcher({
       setHasFileHandle(false);
       setSavedFileName(null);
     }
+    void deleteStoredHandle(rootId);
   };
 
   // Button label: "Parent › Child" when inside a sub-workspace
@@ -390,6 +469,30 @@ export default function WorkspaceSwitcher({
   };
 
   // ---- Open Workspace ----
+  // Compares a newly-opened handle against every handle already known — both in the live
+  // session Map and in IndexedDB (in case the async rehydration in App.tsx hasn't finished
+  // populating the Map yet) — via the spec-correct FileSystemHandle.isSameEntry, since
+  // handles can't be compared by reference or path. Returns the existing root workspace id
+  // on a match, or null.
+  const findExistingRootByHandle = async (
+    newHandle: WorkspaceFileHandle,
+  ): Promise<string | null> => {
+    if (typeof newHandle.isSameEntry !== 'function') return null;
+    const candidates = new Map(fileHandleRef.current);
+    const stored = await getAllStoredHandles();
+    for (const [rootId, handle] of stored.entries()) {
+      if (!candidates.has(rootId)) candidates.set(rootId, handle);
+    }
+    for (const [rootId, existing] of candidates.entries()) {
+      try {
+        if (await newHandle.isSameEntry(existing)) return rootId;
+      } catch {
+        // ignore comparison failures (e.g. handle from a different origin/context)
+      }
+    }
+    return null;
+  };
+
   const restoreWorkspaceFile = (wsFile: import('../utils/workspaceFile').WorkspaceFile) => {
     onSaveCurrent(); // flush any unsaved in-memory edits before switching away
 
@@ -448,6 +551,14 @@ export default function WorkspaceSwitcher({
     if (hasOpenFilePicker()) {
       const result = await openWorkspaceFilePickerWithHandle();
       if (!result) return; // cancelled
+      const existingRootId = await findExistingRootByHandle(result.handle);
+      if (existingRootId && workspaceList.some((w) => w.id === existingRootId)) {
+        // Same file already open as a workspace — switch to it instead of duplicating.
+        setHandleForRoot(existingRootId, result.handle);
+        doSwitch(existingRootId);
+        onSetupDone?.();
+        return;
+      }
       const wsFile = await readWorkspaceFile(result.file);
       if (wsFile) {
         const newRootId = restoreWorkspaceFile(wsFile);
@@ -703,24 +814,44 @@ export default function WorkspaceSwitcher({
 
           {hasSaveFilePicker() && (
             <MenuItem
-              onClick={() => onAutoSaveToFileChange(!autoSaveToFile)}
+              onClick={() => {
+                if (hasFileHandle && permissionState === 'needs-reconnect') { void handleReconnect(); return; }
+                onAutoSaveToFileChange(!autoSaveToFile);
+              }}
               dense
               disabled={!hasFileHandle}
               sx={{ pl: 1 }}
             >
-              <Switch
-                size="small"
-                checked={autoSaveToFile && hasFileHandle}
-                disabled={!hasFileHandle}
-                onChange={(e) => { e.stopPropagation(); onAutoSaveToFileChange(e.target.checked); }}
-                sx={{ mr: 1 }}
-              />
+              {hasFileHandle && permissionState === 'needs-reconnect' ? (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={(e) => { e.stopPropagation(); void handleReconnect(); }}
+                  sx={{ minWidth: 0, mr: 1 }}
+                >
+                  Reconnect
+                </Button>
+              ) : (
+                <Switch
+                  size="small"
+                  checked={autoSaveToFile && hasFileHandle && permissionState === 'granted'}
+                  disabled={!hasFileHandle || permissionState !== 'granted'}
+                  onChange={(e) => { e.stopPropagation(); onAutoSaveToFileChange(e.target.checked); }}
+                  sx={{ mr: 1 }}
+                />
+              )}
               <ListItemText
                 primary="Autosave"
                 secondary={
-                  hasFileHandle
-                    ? 'Saves to file on every change'
-                    : 'Save or open a workspace file first'
+                  !hasFileHandle
+                    ? 'Save or open a workspace file first'
+                    : permissionState === 'needs-reconnect'
+                    ? (savedFileName ? `Click Reconnect to resume saving to ${savedFileName}` : 'Click Reconnect to resume autosave')
+                    : reconnectError === 'not-found'
+                    ? 'Original file was moved or deleted — use Save Workspace to pick a new location'
+                    : reconnectError === 'denied'
+                    ? 'Permission denied — use Save Workspace to pick a new location'
+                    : 'Saves to file on every change'
                 }
               />
             </MenuItem>
@@ -746,6 +877,32 @@ export default function WorkspaceSwitcher({
             <Button onClick={() => setOpenError(null)}>OK</Button>
           </DialogActions>
         </Dialog>
+
+        {/* ---- Reconnect banner ---- */}
+        <Snackbar
+          open={hasFileHandle && permissionState === 'needs-reconnect' && !bannerDismissed}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            severity={reconnectError ? 'error' : 'warning'}
+            variant="filled"
+            onClose={() => setBannerDismissed(true)}
+            action={
+              <Button color="inherit" size="small" onClick={() => void handleReconnect()}>
+                Reconnect
+              </Button>
+            }
+            sx={{ alignItems: 'center' }}
+          >
+            {reconnectError === 'not-found'
+              ? 'Original file was moved or deleted — use Save Workspace to pick a new location.'
+              : reconnectError === 'denied'
+              ? 'Permission denied — use Save Workspace to pick a new location.'
+              : savedFileName
+              ? `Reconnect to resume saving to ${savedFileName}`
+              : 'Reconnect to resume autosave'}
+          </Alert>
+        </Snackbar>
 
         {/* ---- Unsaved workspace guard dialog ---- */}
         <Dialog open={pendingSwitchId !== null} disableEscapeKeyDown maxWidth="xs" fullWidth>
