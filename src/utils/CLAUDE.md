@@ -4,6 +4,7 @@
 
 - **workspaceStorage.ts** — localStorage CRUD for the workspace list and per-workspace project data; defines `WorkspaceMeta`, `WorkspaceData`, `WorkspaceListState`.
 - **workspaceFile.ts** — File System Access API save/open for `.idcard` workspace files and `.idtemplate` template files; also owns FSA type declarations and autosave-pref helpers.
+- **fileHandleStore.ts** — IndexedDB wrapper (`setStoredHandle`, `getStoredHandle`, `getAllStoredHandles`, `deleteStoredHandle`) that persists `WorkspaceFileHandle` objects keyed by root workspace id, so a workspace's `.idcard` file link survives a page reload. Every function resolves to a safe default (`null` / `void` / empty `Map`) instead of throwing — private browsing / IndexedDB-disabled degrades silently to the pre-existing in-memory-only behavior.
 - **userTemplates.ts** — localStorage CRUD for user-saved templates (list of `{ meta, template }` entries).
 - **csv.ts** — Thin PapaParse wrapper; parses a `File` into `{ headers, rows }`.
 - **exportImages.ts** — Renders cards off-screen via `CardCanvas`, captures each with html2canvas. `renderCardsToImages` is the shared rendering core (returns `{ recordIndex, dataUrl, blob }[]`); `exportCardsAsImages` calls it, bundles into a ZIP (with a `manifest.json` recording card mm size + format), and saves via `saveBlob`.
@@ -31,9 +32,17 @@
 
 ## FSA types — do not add @types/wicg-file-system-access
 
-`lib.dom` does not include File System Access API types. Local declarations (`FSWritable`, `WorkspaceFileHandle`, `FSAFileHandle`, `SavePickerOpts`, `OpenPickerOpts`, `WindowWithFSA`) live at the top of `workspaceFile.ts`. Do not install `@types/wicg-file-system-access` — use the local types.
+`lib.dom` does not include File System Access API types. Local declarations (`FSWritable`, `WorkspaceFileHandle`, `FSAFileHandle`, `SavePickerOpts`, `OpenPickerOpts`, `WindowWithFSA`, `FSAPermissionState`) live at the top of `workspaceFile.ts`. Do not install `@types/wicg-file-system-access` — use the local types.
 
 `WorkspaceFileHandle` includes a `name: string` field (the filename) so the UI can display the linked file name. When constructing a mock or stub handle, always include `name`.
+
+`WorkspaceFileHandle` also declares `queryPermission?`, `requestPermission?`, and `isSameEntry?` as **optional** methods — real FSA handles always have them, but hand-built mock/stub handles or older browsers may not. Every call site must feature-detect with `typeof handle.xxx === 'function'` before calling, the same pattern as `hasSaveFilePicker()`/`hasOpenFilePicker()`. Do not make these required — that would force every mock handle in the codebase to fake them.
+
+## IndexedDB — persisted file handles (fileHandleStore.ts)
+
+`FileSystemFileHandle` objects are natively structured-cloneable, so `fileHandleStore.ts` stores them directly in IndexedDB (database `id_card_file_handles`, object store `handles`, keyed by root workspace id) — no serialization needed. This is what lets a workspace's `.idcard` link survive a page reload; before this, `fileHandleRef` in `App.tsx` was purely in-memory and every reload silently dropped the link. See the "WorkspaceSwitcher — file handle rehydration and reconnect" gotcha in `src/components/CLAUDE.md` for how this is wired into the UI.
+
+Note: plain mock handle objects with function properties (e.g. in manual browser testing) are **not** structured-cloneable — only real `FileSystemFileHandle` instances have the browser's native serialization support. `setStoredHandle` catches this via the same "resolve to a safe default" contract, so a non-cloneable value fails silently rather than throwing.
 
 `exportImages.ts` has its own inline FSA type aliases (`FSWritable`, `FSFileHandle`, `SavePickerOpts`) scoped to that function. This is intentional — they only cover `BufferSource | Blob | string` writes, not the workspace file write shape.
 
