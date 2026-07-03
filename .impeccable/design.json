@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-02T00:00:00.000Z",
+  "title": "Design System: ID Card Generator",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Muted Violet", "canonical": "#6750A4", "tonalRamp": ["#21005D", "#381E72", "#4F378B", "#6750A4", "#7F67BE", "#9A82DB", "#D0BCFF", "#E8DEF8"] },
+      "secondary": { "role": "secondary", "displayName": "Muted Plum", "canonical": "#625B71", "tonalRamp": ["#1D192B", "#332D41", "#4A4458", "#625B71", "#7A7289", "#958DA5", "#CCC2DC", "#E8E0EC"] },
+      "error": { "role": "error", "displayName": "Error Red", "canonical": "#B3261E", "tonalRamp": ["#410E0B", "#601410", "#8C1D18", "#B3261E", "#DC362E", "#E46962", "#F2B8B5", "#F9DEDC"] },
+      "surface": { "role": "neutral", "displayName": "Paper White", "canonical": "#FFFBFE", "tonalRamp": ["#1C1B1F", "#313033", "#484649", "#605D64", "#787579", "#939094", "#E6E1E5", "#FFFBFE"] },
+      "neutral-bg": { "role": "neutral", "displayName": "Warm Off-White", "canonical": "#FEF7FF", "tonalRamp": ["#1D1B1E", "#332F35", "#4A454C", "#615C64", "#79747D", "#948F97", "#E7E0E9", "#FEF7FF"] }
+    },
+    "typographyMeta": {
+      "heading": { "displayName": "Heading", "purpose": "Step titles, panel titles — always weight 400, no bold." },
+      "body": { "displayName": "Body", "purpose": "Form labels, field values, table content." }
+    },
+    "shadows": [
+      { "name": "ad-hoc-low", "value": "MUI elevation 1-2", "purpose": "Step indicators, inline alerts. Inconsistent — audit before reuse." },
+      { "name": "ad-hoc-mid", "value": "MUI elevation 3", "purpose": "CardEditDialog. Inconsistent — audit before reuse." },
+      { "name": "preview-grid-shadow", "value": "0 4px 12px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.1)", "purpose": "PreviewGrid cards. Hand-written, outside the MUI elevation scale." }
+    ],
+    "motion": [],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main call-to-action button (Next, Save, Print).",
+      "html": "<button class=\"ds-btn-primary\">Save Workspace</button>",
+      "css": ".ds-btn-primary { background: #6750A4; color: #FFFFFF; padding: 6px 16px; font-family: Roboto, Helvetica, Arial, sans-serif; font-weight: 500; text-transform: none; border: none; border-radius: 20px; transition: background 0.15s, box-shadow 0.15s; } .ds-btn-primary:hover { background: #57448c; } .ds-btn-primary:focus-visible { outline: 2px solid #381E72; outline-offset: 2px; }"
+    },
+    {
+      "name": "Card / Panel",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Default flat surface for step panels and dialogs.",
+      "html": "<div class=\"ds-card\">Panel content</div>",
+      "css": ".ds-card { background: #FFFBFE; border-radius: 12px; padding: 16px; box-shadow: none; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Purple Workbench",
+    "overview": "A soft MD3 violet identity wrapped around a dense, repeat-use production tool. The palette is friendly and calm — muted violet, off-white surfaces — but its job is to stay out of the way of someone running Design → Data → Preview → Print for the tenth time this week, not to make a first impression. Color is a wayfinding signal (active state, primary action), not a decoration.\n\nThe system explicitly rejects the generic-AI-SaaS look: no purple-to-blue gradients, no hero-metric cards, no nested cards, no tiny uppercase eyebrows, no bloated onboarding. It also rejects visual flourish that would slow down a frequent user — this is workbench tooling, not a showcase.",
+    "keyCharacteristics": [
+      "Muted violet primary, used sparingly as a signal, not a wash",
+      "Off-white, low-chroma neutral surfaces (#FEF7FF background, #FFFBFE cards/panels)",
+      "Regular-weight (400) headings throughout — quiet hierarchy, not shouting",
+      "Soft, calm corner radii (8-20px) rather than sharp or aggressively rounded",
+      "Flat by default; shadow use today is ad hoc and due for cleanup"
+    ],
+    "rules": [
+      { "name": "The Sparing Violet Rule", "body": "Primary violet marks the one active action or state on a screen — it is not a background wash or a decorative accent repeated across the layout.", "section": "colors" },
+      { "name": "The No-Shout Rule", "body": "Headings stay at regular weight (400) and buttons are never uppercase-transformed. Emphasis comes from size and placement, not boldness or all-caps.", "section": "typography" }
+    ],
+    "dos": [
+      "Do keep headings at regular weight (400) — no bold display type.",
+      "Do keep primary violet (#6750A4) reserved for the one active action or state per screen.",
+      "Do default new surfaces to flat (elevation: 0) and reserve shadows for genuine overlay/floating context.",
+      "Do keep buttons non-uppercase (textTransform: 'none') and rounded at ~20px."
+    ],
+    "donts": [
+      "Don't use purple-to-blue gradients, hero-metric cards, or nested cards — this system explicitly rejects the generic-AI-SaaS look.",
+      "Don't add tiny uppercase tracked eyebrows or numbered section scaffolding (01 / 02 / 03) — this is a workflow tool, not a landing page.",
+      "Don't add visual flourish, decorative motion, or onboarding chrome that slows down a user running the same flow repeatedly.",
+      "Don't introduce a new one-off boxShadow value without checking the Elevation section first — the current ad hoc shadows are a known inconsistency, not a pattern to extend."
+    ]
+  }
+}

@@ -44,3 +44,7 @@ No test suite exists yet.
 - TypeScript strict mode. Prefer `type` over `interface` for object shapes.
 - MUI sx prop for inline styles; avoid adding separate CSS files.
 - No comments unless the WHY is non-obvious.
+
+## Design Context
+
+`PRODUCT.md` (register, users, brand personality: "Purple Workbench" — MD3 violet identity for a dense, repeat-use tool) and `DESIGN.md` (color/typography/component tokens, current elevation inconsistencies) describe the app's design system for the `impeccable` skill. Read them before any UI/design-affecting change.
