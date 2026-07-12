@@ -198,10 +198,9 @@ export default function PreviewStep() {
         </Typography>
       ) : (
         <>
-          {/* Controls: actions row (search/selection/print) and pagination row wrap independently
-              so a narrow viewport never splits "Cards per page" from its page-count text. */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Single controls row: pagination controls sit inline with the action controls,
+              grouped in a nowrap Box so "Cards per page" never splits from its page-count text. */}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', mb: 2 }}>
               <TextField
                 size="small"
                 placeholder="Search cards…"
@@ -280,9 +279,7 @@ export default function PreviewStep() {
               >
                 Print {selectedCardIndices.length > 0 ? 'Selected' : 'All'}
               </Button>
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'nowrap', ml: 'auto' }}>
               <FormControl size="small" sx={{ minWidth: 185 }}>
                 <InputLabel>Cards per page</InputLabel>
                 <Select
