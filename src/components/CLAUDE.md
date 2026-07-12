@@ -4,7 +4,7 @@
 
 - **DesignStep.tsx** — Step 1: card canvas (`CardCanvas` in `designMode=true`) + toolbar (add elements, template picker, background/watermark panel, save template menu).
 - **DataStep.tsx** — Step 2: CSV file upload + column→binding mapping; dispatches `SET_CSV_DATA`, `SET_COLUMN_MAPPING`, and `SET_RECORDS`.
-- **PreviewStep.tsx** — Step 3: paginated, searchable grid of rendered cards with per-card edit, webcam photo capture, image crop, and bulk photo assignment from a folder. The "Bulk add photos" button (hidden when no image binding exists on the template) opens a folder picker via a hidden `<input webkitdirectory>`; images are read in parallel with `Promise.all`/`FileReader` and handed to `BulkPhotoModal`.
+- **PreviewStep.tsx** — Step 3: paginated, searchable grid of rendered cards with per-card edit, webcam photo capture, image crop, and bulk photo assignment from a folder. The "Bulk add photos" button (hidden when no image binding exists on the template) opens a folder picker via a hidden `<input webkitdirectory>`; images are read in parallel with `Promise.all`/`FileReader` and handed to `BulkPhotoModal`. All toolbar controls (search, bulk photos, selection buttons, print, cards-per-page + page count) live in a **single wrapping flex row**; the pagination pair sits in a `nowrap` inner Box pushed right with `ml: 'auto'` so "Cards per page" never splits from its page-count text when the row wraps. Do not split the toolbar back into stacked rows.
 - **PrintStep.tsx** — Step 4: print settings, live print preview, image export (PNG/JPG ZIP), and "Combine into one PDF" (opens `CombinePdfDialog`). Imports `computeLayout` and `computeEffectivePaperDims` from `PrintSettings.tsx`.
 
 ## Sub-components
