@@ -40,7 +40,7 @@ hMm = orientation === 'portrait' ? widthMm  : heightMm  // card height
 Apply this same swap anywhere you compute card pixel dimensions. `PreviewGrid` and `PrintView` do it internally; do not pre-swap when calling them.
 
 ### WorkspaceSwitcher — template sync on `.idcard` import
-`LOAD_WORKSPACE_STATE` (the dispatch action) does **not** sync user templates embedded in a workspace file into `id-card-user-templates`. `restoreWorkspaceFile()` handles this explicitly: it calls `saveUserTemplate()` for every workspace/child whose `currentTemplateSource.type === 'user'` if the template id is not already present in localStorage. If you add new import paths, replicate this sync.
+`LOAD_WORKSPACE_STATE` (the dispatch action) does **not** sync user templates embedded in a workspace file into `id-card-user-templates`. `restoreWorkspaceFile()` handles this explicitly: it calls `saveUserTemplate()` for every workspace/child whose `currentTemplateSource.type === 'user'` if the template id is not already present in localStorage; a `false` return (quota) sets `templateSyncError`, shown as an error Snackbar (the workspace itself still opens). If you add new import paths, replicate this sync and its quota surfacing.
 
 ### WorkspaceSwitcher — per-workspace file handles
 `fileHandleRef` in `App.tsx` is a `Map<rootId, WorkspaceFileHandle>` (not a single nullable). Each workspace tree (root + its sub-workspaces) stores its own handle keyed by the root workspace id. `setHandleForRoot` / `clearHandleForRoot` helpers in `WorkspaceSwitcher` update the map and keep the local `hasFileHandle` / `savedFileName` state in sync. Both helpers also fire-and-forget `setStoredHandle`/`deleteStoredHandle` from `src/utils/fileHandleStore.ts` so the link survives a reload — see the next section.
@@ -83,7 +83,8 @@ Menu item handlers that open a dialog (e.g. `handleNewSubWorkspace`) call `setXO
 
 ### TemplatePicker patterns
 - **"Import from file" button**: uses `<Button component="label">` wrapping a hidden `<input type="file">`. This is the MUI `component="label"` pattern — do not replace with a `Box component="label"` or a separate click handler.
-- **`importAndSelect()`**: always assigns a fresh id (`user-${Date.now()}`), saves to localStorage via `saveUserTemplate`, reloads local state, calls `onSelect`, then calls `onClose`. Do not skip the id reassignment — it prevents silently overwriting an existing template with the same id.
+- **`importAndSelect()`**: always assigns a fresh id (`user-${Date.now()}`), saves to localStorage via `saveUserTemplate`, reloads local state, calls `onSelect`, then calls `onClose`. Do not skip the id reassignment — it prevents silently overwriting an existing template with the same id. If `saveUserTemplate` returns `false` (quota), an error dialog is shown but the template is still applied to the workspace (it exists in memory).
+- **`handleSelectUser()` resolves asset refs**: stored user templates hold `asset:` refs for large images, so selection awaits `resolveTemplateAssets(template)` before calling `onSelect`. Never pass a template from `loadUserTemplates()` into app state without resolving.
 - **Template list refresh**: the dialog reloads from localStorage on every open via `useEffect(() => { if (open) setUserTemplates(loadUserTemplates()); }, [open])`. Do not add an in-memory cache that would bypass this.
 - **No built-in templates**: the modal only shows user-saved templates. Do not add built-in templates back — they were intentionally removed.
 

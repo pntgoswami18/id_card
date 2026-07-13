@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileOpenIcon from '@mui/icons-material/FileOpen';
 import { loadUserTemplates, deleteUserTemplate, saveUserTemplate } from '../utils/userTemplates';
+import { resolveTemplateAssets } from '../utils/assetStore';
 import {
   readTemplateFile,
 } from '../utils/workspaceFile';
@@ -34,8 +35,9 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
     if (open) setUserTemplates(loadUserTemplates());
   }, [open]);
 
-  const handleSelectUser = (meta: UserTemplateMeta, template: Template) => {
-    onSelect(template, { type: 'user', id: meta.id });
+  const handleSelectUser = async (meta: UserTemplateMeta, template: Template) => {
+    // Stored templates may hold asset: refs — resolve to data URLs before entering app state.
+    onSelect(await resolveTemplateAssets(template), { type: 'user', id: meta.id });
     onClose();
   };
 
@@ -55,7 +57,11 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
   const importAndSelect = (t: Template) => {
     // Assign a fresh id so the import never silently overwrites an existing user template
     const imported: Template = { ...t, id: `user-${Date.now()}` };
-    saveUserTemplate(imported);
+    if (!saveUserTemplate(imported)) {
+      setImportError(
+        'Browser storage is full — the template could not be saved to "My templates". It will still be applied to this workspace.',
+      );
+    }
     setUserTemplates(loadUserTemplates());
     onSelect(imported, { type: 'user', id: imported.id });
     onClose();
@@ -103,7 +109,7 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
                     </IconButton>
                   }
                 >
-                  <ListItemButton onClick={() => handleSelectUser(meta, template)}>
+                  <ListItemButton onClick={() => void handleSelectUser(meta, template)}>
                     <ListItemText
                       primary={meta.name}
                       secondary={new Date(meta.savedAt).toLocaleDateString()}
