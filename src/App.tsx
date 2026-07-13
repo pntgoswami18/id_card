@@ -136,6 +136,12 @@ function AppContent() {
           skipAutoSaveRef.current = true;
           dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: { ...resolved, logo: resolved.logo } });
         }
+      } catch (err) {
+        // The storage helpers guard against IndexedDB/localStorage failures, so
+        // this only fires on a truly unexpected error — surface it instead of
+        // leaving it as an unhandled rejection. The finally still lifts the gate.
+        console.error('Boot initialization failed:', err);
+        setStorageError('Something went wrong while loading your saved data. Reload the page to try again.');
       } finally {
         // Always lift the boot gate, even if a read unexpectedly threw, so the UI
         // never gets stuck on the spinner.
