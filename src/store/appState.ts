@@ -29,6 +29,8 @@ export interface AppState {
   currentWorkspaceLogo?: string;
   /** Parsed CSV for the Data step. Persisted to localStorage so column-mapping survives page reload. Stripped from .idcard file exports and workspace duplicates. */
   csvData: ParsedCsv | null;
+  /** Copy-on-write template inheritance: true while this sub-workspace tracks the parent's template. Cleared by any template mutation (detach). */
+  templateLinkedToParent: boolean;
 }
 
 export type AppAction =
@@ -83,16 +85,20 @@ export const initialState: AppState = {
   workspaceList: [],
   currentWorkspaceLogo: undefined,
   csvData: null,
+  templateLinkedToParent: false,
 };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_ACTIVE_STEP':
       return { ...state, activeStep: action.payload };
+    // Every template mutation detaches a linked sub-workspace from the parent's
+    // template (copy-on-write): the current effective template in state becomes
+    // this workspace's own independent snapshot on the next save.
     case 'SET_TEMPLATE':
-      return { ...state, template: action.payload };
+      return { ...state, template: action.payload, templateLinkedToParent: false };
     case 'UPDATE_TEMPLATE_ELEMENTS':
-      return { ...state, template: { ...state.template, elements: action.payload } };
+      return { ...state, template: { ...state.template, elements: action.payload }, templateLinkedToParent: false };
     case 'UPDATE_TEMPLATE_ELEMENT': {
       const { id, updates } = action.payload;
       const elements = state.template.elements.map((el) => {
@@ -110,12 +116,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         }
         return { ...el, ...safeUpdates } as TemplateElement;
       });
-      return { ...state, template: { ...state.template, elements } };
+      return { ...state, template: { ...state.template, elements }, templateLinkedToParent: false };
     }
     case 'UPDATE_TEMPLATE_BACKGROUND':
-      return { ...state, template: { ...state.template, background: action.payload } };
+      return { ...state, template: { ...state.template, background: action.payload }, templateLinkedToParent: false };
     case 'UPDATE_TEMPLATE_WATERMARK':
-      return { ...state, template: { ...state.template, watermark: action.payload } };
+      return { ...state, template: { ...state.template, watermark: action.payload }, templateLinkedToParent: false };
     case 'SET_RECORDS':
       // Clear csvData when records are cleared (e.g. workspace load), keep it when generating cards
       return {
@@ -189,6 +195,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...('logo' in p ? { currentWorkspaceLogo: p.logo } : {}),
         // Restore csvData so the Data step shows column-mapping on reload (null when not saved yet)
         csvData: 'csvData' in p ? (p.csvData ?? null) : null,
+        templateLinkedToParent: p.templateLinkedToParent ?? false,
       };
     }
     case 'SET_CURRENT_WORKSPACE':

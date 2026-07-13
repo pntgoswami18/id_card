@@ -3,6 +3,7 @@
 ## File responsibilities
 
 - **workspaceStorage.ts** — localStorage CRUD for the workspace list and per-workspace project data; defines `WorkspaceMeta`, `WorkspaceData`, `WorkspaceListState`.
+- **assetStore.ts** — content-addressed IndexedDB store (db `id_card_assets`) for large data URLs. `externalizeWorkspaceAssets` (sync) swaps template background/watermark images and card photo overrides above 8KB for `asset:<hash>` refs at persistence time; `resolveWorkspaceAssets` (async) swaps them back at load time. See "Asset store" section below.
 - **workspaceFile.ts** — File System Access API save/open for `.idcard` workspace files and `.idtemplate` template files; also owns FSA type declarations and autosave-pref helpers.
 - **fileHandleStore.ts** — IndexedDB wrapper (`setStoredHandle`, `getStoredHandle`, `getAllStoredHandles`, `deleteStoredHandle`) that persists `WorkspaceFileHandle` objects keyed by root workspace id, so a workspace's `.idcard` file link survives a page reload. Every function resolves to a safe default (`null` / `void` / empty `Map`) instead of throwing — private browsing / IndexedDB-disabled degrades silently to the pre-existing in-memory-only behavior.
 - **userTemplates.ts** — localStorage CRUD for user-saved templates (list of `{ meta, template }` entries).
@@ -29,6 +30,21 @@
 `csvData` is written to localStorage with each workspace save so column-mapping survives page reload. It is stripped from `.idcard` file exports (`buildFileContent` destructures it out) and from workspace duplicates (`duplicateWorkspace` strips it).
 
 `saveWorkspaceData` side-effects: if `data.logo` is set, it calls `updateWorkspaceMeta` to keep the list entry's logo in sync.
+
+## Copy-on-write template inheritance (`templateLinkedToParent`)
+
+Sub-workspaces are created with `templateLinkedToParent: true` in their `WorkspaceData`: their stored `template` is only a fallback snapshot, and the *effective* template is the parent's current one. **Load stored data through `getEffectiveWorkspaceData(id)`, not `getWorkspaceData(id)`,** whenever the data feeds app state or rendering (workspace switch, hydration, delete-then-load, Combine-PDF). It overlays the parent's template when linked, and self-heals to a detached copy if the parent record is missing. Detachment happens in the reducer: any template mutation clears the flag in `AppState`, and the next save persists the workspace's own snapshot. `duplicateWorkspace` duplicates from *effective* data and strips the flag (a duplicate under a different parent must not adopt that parent's design). The flag round-trips through `.idcard` files and backups (`buildFileContent` keeps it). Raw `getWorkspaceData` remains correct for save-to-file paths, which intentionally write the snapshot + flag.
+
+## Asset store — large data URLs never go to localStorage
+
+localStorage's ~5MB quota is the reason this layer exists: a template background image is a multi-MB base64 data URL, and every sub-workspace/duplicate used to get a full copy, silently exhausting the quota (workspaces then lost their template on reload — the original bug).
+
+- **Write path**: `saveWorkspaceData` calls `externalizeWorkspaceAssets` before `setItem`. Data URLs > 8KB in `template.background.value`, `template.watermark.value`, and `record.overrides` values are replaced with `asset:<fnv1a-hash>-<len>` refs; the blobs go to IndexedDB (fire-and-forget, deduped by content hash + in-memory `persisted` set). The localStorage JSON stays small. `saveWorkspaceData` returns **`boolean`** — `false` on quota failure. Creation flows (`handleNewSubWorkspaceConfirm`) must write data first, check the result, and abort registration on failure.
+- **Read path**: `getWorkspaceData` still returns raw stored data, which may contain `asset:` refs. **Every consumer that feeds data into app state or a self-contained artifact must `await resolveWorkspaceAssets(data)` first.** Current resolve sites: App.tsx hydration + autosave-to-file, WorkspaceSwitcher (`doSwitch`, sub-workspace creation, delete, save-to-file, both duplicate flows), CombinePdfDialog `generateFromWorkspaces`, backup.ts `createBackup`. In-memory `AppState` and all rendering code only ever see plain data URLs.
+- **Self-contained artifacts**: `.idcard` files and backup JSON must contain real data URLs (portable across machines), so resolve before `writeWorkspaceToHandle`/`buildFileContent`; `restoreFromBackup`/`restoreWorkspaceFile` re-externalize automatically by routing through `saveWorkspaceData`.
+- **Migration-free**: pre-existing stored data with inline data URLs passes through `resolveWorkspaceAssets` untouched and is externalized on its next save.
+- **Missing asset** (e.g. IndexedDB cleared): `resolveWorkspaceAssets` drops the background/watermark to `null` with a console.warn rather than rendering a broken `asset:` string.
+- User templates (`id-card-user-templates`) are NOT externalized yet — known follow-up.
 
 ## FSA types — do not add @types/wicg-file-system-access
 

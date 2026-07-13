@@ -16,8 +16,10 @@ import Menu from '@mui/material/Menu';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import Chip from '@mui/material/Chip';
 import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import LinkIcon from '@mui/icons-material/Link';
 import { useAppState, useAppDispatch } from '../store/AppStateContext';
 import CardCanvas from './CardCanvas';
 import TemplatePicker from './TemplatePicker';
@@ -33,7 +35,7 @@ const COMMON_BINDINGS = ['name', 'id', 'photo', 'department', 'company', 'course
 const OFFSET_PASTE = 5;
 
 export default function DesignStep() {
-  const { activeStep, template, printSettings, watermarkEditMode, currentTemplateSource } = useAppState();
+  const { activeStep, template, printSettings, watermarkEditMode, currentTemplateSource, templateLinkedToParent } = useAppState();
   const dispatch = useAppDispatch();
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -270,6 +272,14 @@ export default function DesignStep() {
         <Button variant="outlined" size="small" onClick={() => setTemplatePickerOpen(true)}>
           Start From Template
         </Button>
+        {templateLinkedToParent && (
+          <Tooltip
+            title="This sub-workspace uses its parent workspace's template. Design changes made on the parent appear here automatically. Editing the design here detaches it into an independent copy."
+            placement="bottom"
+          >
+            <Chip icon={<LinkIcon />} label="Linked to parent template" size="small" color="primary" variant="outlined" />
+          </Tooltip>
+        )}
         <Tooltip title={getStartedText} placement="bottom" enterDelay={300}>
           <IconButton size="small" color="info" aria-label="Get started help">
             <InfoOutlined fontSize="small" />

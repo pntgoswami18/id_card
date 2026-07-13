@@ -39,6 +39,8 @@ No test suite exists yet.
 
 **CSV data is persisted to localStorage** (`csvData` in `AppState`) so column-mapping survives a page reload or workspace switch. It is stripped from `.idcard` file exports (`buildFileContent` destructures it out) and from workspace duplicates (`duplicateWorkspace` strips it). Opening a `.idcard` file clears csvData because it is absent from the file payload.
 
+**Large images are stored in IndexedDB, not localStorage.** `saveWorkspaceData` swaps data URLs > 8KB (template background/watermark, card photo overrides) for `asset:<hash>` refs backed by the `id_card_assets` IndexedDB store, and returns `false` on quota failure. Stored data from `getWorkspaceData` may therefore contain refs — always `await resolveWorkspaceAssets(data)` (from `src/utils/assetStore.ts`) before dispatching it into app state or writing a self-contained file (.idcard / backup). See `src/utils/CLAUDE.md` § "Asset store".
+
 ## Code style
 
 - TypeScript strict mode. Prefer `type` over `interface` for object shapes.

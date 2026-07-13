@@ -38,6 +38,7 @@ import {
   DATA_PREFIX,
   getWorkspaceList,
   getWorkspaceData,
+  getEffectiveWorkspaceData,
   createWorkspace,
   createWorkspaceId,
   saveWorkspaceList,
@@ -59,6 +60,7 @@ import {
   type WorkspaceFileHandle,
 } from '../utils/workspaceFile';
 import { setStoredHandle, deleteStoredHandle, getAllStoredHandles } from '../utils/fileHandleStore';
+import { resolveWorkspaceAssets } from '../utils/assetStore';
 import { readFileAsDataUrl } from '../utils/file';
 import { loadUserTemplates, saveUserTemplate } from '../utils/userTemplates';
 
@@ -117,6 +119,7 @@ export default function WorkspaceSwitcher({
   const [newSubLogo, setNewSubLogo] = useState<string | null>(null);
   // Sub-workspaces always inherit the parent's template and print settings
   const [newSubParentId, setNewSubParentId] = useState<string | null>(null);
+  const [newSubError, setNewSubError] = useState<string | null>(null);
   const newSubNameInputRef = useRef<HTMLInputElement>(null);
 
   // The Dialog's autoFocus races with the closing workspace Menu's own focus
@@ -275,15 +278,17 @@ export default function WorkspaceSwitcher({
   const handleClose = () => setAnchorEl(null);
 
   // ---- Switch ----
-  const doSwitch = (id: string) => {
+  const doSwitch = async (id: string) => {
     onSaveCurrent();
     const list = getWorkspaceList();
     list.currentId = id;
     saveWorkspaceList(list);
+    const data = getEffectiveWorkspaceData(id);
+    // Resolve asset refs BEFORE any dispatch: all three dispatches must land in one
+    // render batch so onLoadWorkspace's autosave skip-flag covers the id change too.
+    const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(id);
-    const data = getWorkspaceData(id);
-    const toLoad = data ?? getDefaultWorkspaceData();
     onLoadWorkspace({ ...toLoad, logo: toLoad.logo });
     handleClose();
   };
@@ -298,7 +303,7 @@ export default function WorkspaceSwitcher({
       handleClose();
       return;
     }
-    doSwitch(id);
+    void doSwitch(id);
   };
 
   const handleUnsavedSaveAndSwitch = async () => {
@@ -306,14 +311,14 @@ export default function WorkspaceSwitcher({
     const targetId = pendingSwitchId;
     setPendingSwitchId(null);
     const saved = await handleSaveWorkspace();
-    if (saved) doSwitch(targetId);
+    if (saved) await doSwitch(targetId);
   };
 
   const handleUnsavedSwitchAnyway = () => {
     if (!pendingSwitchId) return;
     const targetId = pendingSwitchId;
     setPendingSwitchId(null);
-    doSwitch(targetId);
+    void doSwitch(targetId);
   };
 
   // ---- New workspace ----
@@ -355,36 +360,50 @@ export default function WorkspaceSwitcher({
     setNewSubParentId(parentId);
     setNewSubName('');
     setNewSubLogo(null);
+    setNewSubError(null);
     setNewSubOpen(true);
     handleClose();
   };
 
-  const handleNewSubWorkspaceConfirm = () => {
+  const handleNewSubWorkspaceConfirm = async () => {
     const name = newSubName.trim();
     if (!name || !newSubParentId) return;
     const logo = newSubLogo ?? undefined;
     onSaveCurrent();
-    const meta = createSubWorkspace(name, newSubParentId, logo);
-    const list = getWorkspaceList();
-    onSetWorkspaceList(list.workspaces);
-    onSetCurrentWorkspace(meta.id);
     let initialData = getDefaultWorkspaceData();
     const parentData = getWorkspaceData(newSubParentId);
     if (parentData) {
+      // Stored parent data may hold asset: refs — resolve so in-memory state gets real data URLs.
+      const resolved = await resolveWorkspaceAssets(parentData);
       initialData = {
         ...initialData,
-        template: parentData.template,
-        currentTemplateSource: parentData.currentTemplateSource,
-        printSettings: parentData.printSettings,
-        printPresets: parentData.printPresets,
+        template: resolved.template,
+        currentTemplateSource: resolved.currentTemplateSource,
+        printSettings: resolved.printSettings,
+        printPresets: resolved.printPresets,
+        // Copy-on-write: track the parent's template (own template is a fallback
+        // snapshot) until this sub-workspace makes its first design edit.
+        templateLinkedToParent: true,
       };
     }
+    // Persist the data BEFORE registering the workspace in the list, so a failed
+    // write aborts creation instead of leaving a workspace that silently lost
+    // its inherited template.
+    const newId = createWorkspaceId();
+    if (!saveWorkspaceData(newId, { ...initialData, logo })) {
+      setNewSubError('Could not create the sub-workspace: browser storage is full. Delete unused workspaces or remove large images, then try again.');
+      return;
+    }
+    const meta = createSubWorkspace(name, newSubParentId, logo, newId);
+    const list = getWorkspaceList();
+    onSetWorkspaceList(list.workspaces);
+    onSetCurrentWorkspace(meta.id);
     onLoadWorkspace({ ...initialData, logo });
-    saveWorkspaceData(meta.id, { ...initialData, logo });
     setNewSubOpen(false);
     setNewSubName('');
     setNewSubLogo(null);
     setNewSubParentId(null);
+    setNewSubError(null);
   };
 
   // ---- Edit ----
@@ -413,16 +432,16 @@ export default function WorkspaceSwitcher({
   // ---- Delete ----
   const handleDeleteOpen = () => { setDeleteOpen(true); handleClose(); };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!currentWorkspaceId) return;
     clearHandleForRoot(currentRootId);
     onSaveCurrent();
     deleteWorkspaceTree(currentWorkspaceId);
     const list = getWorkspaceList();
+    const data = getEffectiveWorkspaceData(list.currentId);
+    const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(list.currentId);
-    const data = getWorkspaceData(list.currentId);
-    const toLoad = data ?? getDefaultWorkspaceData();
     onLoadWorkspace({ ...toLoad, logo: toLoad.logo });
     setDeleteOpen(false);
   };
@@ -437,16 +456,17 @@ export default function WorkspaceSwitcher({
       onSaveCurrent(); // flush current to localStorage before reading child data
 
       // Always save from the root perspective so children are included.
+      // Resolve asset: refs so the .idcard file is self-contained.
       const rootId = currentMeta?.parentId ?? currentWorkspaceId;
       const rootMeta = workspaceList.find((w) => w.id === rootId);
-      const rootData = getWorkspaceData(rootId) ?? getDefaultWorkspaceData();
+      const rootData = await resolveWorkspaceAssets(getWorkspaceData(rootId) ?? getDefaultWorkspaceData());
       const rootName = rootMeta?.name ?? 'Workspace';
 
       const childMetas = workspaceList.filter((w) => w.parentId === rootId);
-      const children = childMetas.map((meta) => ({
+      const children = await Promise.all(childMetas.map(async (meta) => ({
         meta: { name: meta.name, ...(meta.logo ? { logo: meta.logo } : {}) },
-        data: getWorkspaceData(meta.id) ?? getDefaultWorkspaceData(),
-      }));
+        data: await resolveWorkspaceAssets(getWorkspaceData(meta.id) ?? getDefaultWorkspaceData()),
+      })));
 
       const existingHandle = fileHandleRef.current.get(rootId);
       if (existingHandle) {
@@ -555,7 +575,7 @@ export default function WorkspaceSwitcher({
       if (existingRootId && workspaceList.some((w) => w.id === existingRootId)) {
         // Same file already open as a workspace — switch to it instead of duplicating.
         setHandleForRoot(existingRootId, result.handle);
-        doSwitch(existingRootId);
+        await doSwitch(existingRootId);
         onSetupDone?.();
         return;
       }
@@ -590,16 +610,17 @@ export default function WorkspaceSwitcher({
     handleClose();
   };
 
-  const handleDupRootConfirm = () => {
+  const handleDupRootConfirm = async () => {
     const name = dupRootName.trim();
     if (!name) return;
     onSaveCurrent();
     const meta = duplicateWorkspace(currentWorkspaceId, name);
     const list = getWorkspaceList();
+    const data = getWorkspaceData(meta.id);
+    const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(meta.id);
-    const data = getWorkspaceData(meta.id);
-    onLoadWorkspace({ ...(data ?? getDefaultWorkspaceData()), logo: data?.logo });
+    onLoadWorkspace({ ...toLoad, logo: data?.logo });
     setDupRootOpen(false);
     setDupRootName('');
   };
@@ -616,7 +637,7 @@ export default function WorkspaceSwitcher({
     handleClose();
   };
 
-  const handleDupSubConfirm = () => {
+  const handleDupSubConfirm = async () => {
     const name = dupSubName.trim();
     if (!name || !currentMeta?.parentId) return;
 
@@ -646,10 +667,11 @@ export default function WorkspaceSwitcher({
 
     const meta = duplicateWorkspace(currentWorkspaceId, name, targetParentId);
     const list = getWorkspaceList();
+    const data = getWorkspaceData(meta.id);
+    const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(meta.id);
-    const data = getWorkspaceData(meta.id);
-    onLoadWorkspace({ ...(data ?? getDefaultWorkspaceData()), logo: data?.logo });
+    onLoadWorkspace({ ...toLoad, logo: data?.logo });
 
     setDupSubOpen(false);
     setDupSubName('');
@@ -1055,10 +1077,15 @@ export default function WorkspaceSwitcher({
               label="Name"
               value={newSubName}
               onChange={(e) => setNewSubName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleNewSubWorkspaceConfirm()}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleNewSubWorkspaceConfirm(); }}
               placeholder="e.g. VIP Guests"
               sx={{ mt: 1, mb: 1.5 }}
             />
+            {newSubError && (
+              <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setNewSubError(null)}>
+                {newSubError}
+              </Alert>
+            )}
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               The card template and print settings will be inherited from the parent workspace.
               You can update them later in the Design step.
@@ -1086,7 +1113,7 @@ export default function WorkspaceSwitcher({
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setNewSubOpen(false)}>Cancel</Button>
-            <Button variant="contained" onClick={handleNewSubWorkspaceConfirm} disabled={!newSubName.trim()}>
+            <Button variant="contained" onClick={() => void handleNewSubWorkspaceConfirm()} disabled={!newSubName.trim()}>
               Create
             </Button>
           </DialogActions>

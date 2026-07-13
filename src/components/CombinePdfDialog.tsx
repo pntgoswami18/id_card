@@ -19,7 +19,8 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import Alert from '@mui/material/Alert';
 import LinearProgress from '@mui/material/LinearProgress';
-import { getWorkspaceList, getWorkspaceData } from '../utils/workspaceStorage';
+import { getWorkspaceList, getEffectiveWorkspaceData } from '../utils/workspaceStorage';
+import { resolveWorkspaceAssets } from '../utils/assetStore';
 import { renderCardsToImages } from '../utils/exportImages';
 import { importCardsFromFiles } from '../utils/importImages';
 import { aggregateCardsToPdf, type CardImage } from '../utils/aggregatePdf';
@@ -128,10 +129,12 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
   const generateFromWorkspaces = async () => {
     const cards: CardImage[] = [];
     // First pass: total card count for progress.
-    const plans = Array.from(selectedIds)
-      .map((id) => {
-        const data = getWorkspaceData(id);
-        if (!data || data.records.length === 0) return null;
+    const plans = (await Promise.all(
+      Array.from(selectedIds).map(async (id) => {
+        const raw = getEffectiveWorkspaceData(id);
+        if (!raw || raw.records.length === 0) return null;
+        // Stored data may hold asset: refs — resolve before rendering cards.
+        const data = await resolveWorkspaceAssets(raw);
         const ps = data.printSettings;
         const cw = ps.orientation === 'portrait' ? ps.heightMm : ps.widthMm;
         const ch = ps.orientation === 'portrait' ? ps.widthMm : ps.heightMm;
@@ -140,8 +143,8 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
             ? data.selectedCardIndices
             : data.records.map((_, i) => i);
         return { data, cw, ch, indices };
-      })
-      .filter((p): p is NonNullable<typeof p> => p !== null);
+      }),
+    )).filter((p): p is NonNullable<typeof p> => p !== null);
 
     const total = plans.reduce((sum, p) => sum + p.indices.length, 0);
     if (total === 0) throw new Error('Selected workspaces have no cards to combine.');
