@@ -6,12 +6,7 @@ import {
   restoreUserTemplates,
   saveUserTemplate,
 } from './userTemplates';
-import { createIdbTable } from './idbStore';
-import { ALL_STORE_NAMES } from './idbSchema';
-
-async function clearAllStores() {
-  await Promise.all(ALL_STORE_NAMES.map((name) => createIdbTable(name).clear()));
-}
+import { clearAllStores } from './testHelpers';
 
 beforeEach(async () => {
   await clearAllStores();

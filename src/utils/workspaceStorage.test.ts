@@ -15,12 +15,7 @@ import {
   setCurrentWorkspace,
   updateWorkspaceMeta,
 } from './workspaceStorage';
-import { createIdbTable } from './idbStore';
-import { ALL_STORE_NAMES } from './idbSchema';
-
-async function clearAllStores() {
-  await Promise.all(ALL_STORE_NAMES.map((name) => createIdbTable(name).clear()));
-}
+import { clearAllStores } from './testHelpers';
 
 beforeEach(async () => {
   await clearAllStores();
@@ -88,15 +83,15 @@ describe('renameWorkspace / updateWorkspaceMeta / setCurrentWorkspace', () => {
 
   it('setCurrentWorkspace switches currentId only for a known workspace', async () => {
     const a = await createWorkspace('A');
-    const b = await createWorkspace('B');
-    // createWorkspace('B') already made B current; explicitly switch back to A.
+    // A second workspace whose creation makes B current, so switching back to A
+    // below actually exercises setCurrentWorkspace rather than being a no-op.
+    await createWorkspace('B');
     await setCurrentWorkspace(a.id);
     expect((await getWorkspaceList()).currentId).toBe(a.id);
 
     await setCurrentWorkspace('unknown-id');
     // Unknown id is ignored — currentId stays put.
     expect((await getWorkspaceList()).currentId).toBe(a.id);
-    void b;
   });
 });
 
@@ -119,6 +114,20 @@ describe('sub-workspaces and copy-on-write template inheritance', () => {
     const parent = await createWorkspace('Parent');
     const child = await createSubWorkspace('Child', parent.id);
     await expect(createSubWorkspace('Grandchild', child.id)).rejects.toThrow(/already a child/);
+  });
+
+  it('getEffectiveWorkspaceData returns stored data untouched for an unlinked workspace', async () => {
+    const ws = await createWorkspace('Standalone');
+    const ownTemplate = { id: 'own-tpl', name: 'Own Template', elements: [], background: null, watermark: null };
+    const data = { ...getDefaultWorkspaceData(), template: ownTemplate };
+    await saveWorkspaceData(ws.id, data);
+
+    // No templateLinkedToParent flag → no parent lookup, plain pass-through.
+    expect(await getEffectiveWorkspaceData(ws.id)).toEqual(data);
+  });
+
+  it('getEffectiveWorkspaceData returns null for a workspace with no stored data', async () => {
+    expect(await getEffectiveWorkspaceData('nonexistent')).toBeNull();
   });
 
   it('getEffectiveWorkspaceData overlays the parent template while linked', async () => {

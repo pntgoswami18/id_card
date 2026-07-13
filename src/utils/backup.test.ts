@@ -3,12 +3,7 @@ import { createBackup, isBackupData, restoreFromBackup, type BackupData } from '
 import { createWorkspace, createSubWorkspace, getDefaultWorkspaceData, getWorkspaceData, getWorkspaceList, saveWorkspaceData } from './workspaceStorage';
 import { loadUserTemplates, saveUserTemplate } from './userTemplates';
 import { loadPrintPresets, savePrintPreset } from './printPresets';
-import { createIdbTable } from './idbStore';
-import { ALL_STORE_NAMES } from './idbSchema';
-
-async function clearAllStores() {
-  await Promise.all(ALL_STORE_NAMES.map((name) => createIdbTable(name).clear()));
-}
+import { clearAllStores } from './testHelpers';
 
 beforeEach(async () => {
   await clearAllStores();
@@ -93,6 +88,32 @@ describe('createBackup / restoreFromBackup round-trip', () => {
     expect(result).toEqual({ ok: true });
     expect((await getWorkspaceData('known'))?.records).toEqual([{ name: 'Real' }]);
     expect(await getWorkspaceData('ghost')).toBeNull();
+  });
+
+  it('skips malformed workspaceData entries (missing template or non-array records) without failing', async () => {
+    const backup = makeBackup({
+      workspaceList: {
+        currentId: 'good',
+        workspaces: [
+          { id: 'good', name: 'Good' },
+          { id: 'noTemplate', name: 'No Template' },
+          { id: 'badRecords', name: 'Bad Records' },
+        ],
+      },
+      workspaceData: {
+        good: { ...getDefaultWorkspaceData(), records: [{ name: 'Real' }] },
+        // Malformed payloads that pass the id check but fail the shape guard.
+        noTemplate: { ...getDefaultWorkspaceData(), template: undefined } as unknown as ReturnType<typeof getDefaultWorkspaceData>,
+        badRecords: { ...getDefaultWorkspaceData(), records: 'nope' } as unknown as ReturnType<typeof getDefaultWorkspaceData>,
+      },
+    });
+
+    const result = await restoreFromBackup(backup);
+    expect(result).toEqual({ ok: true });
+    expect((await getWorkspaceData('good'))?.records).toEqual([{ name: 'Real' }]);
+    // Guarded out — neither malformed row was written.
+    expect(await getWorkspaceData('noTemplate')).toBeNull();
+    expect(await getWorkspaceData('badRecords')).toBeNull();
   });
 
   it('falls back currentId to the first workspace when the backup points at an unknown current id', async () => {
