@@ -193,7 +193,14 @@ async function resolveRecords(records: CardRecord[]): Promise<CardRecord[]> {
       const entries = Object.entries(r.overrides ?? {});
       if (!entries.some(([, v]) => isAssetRef(v))) return r;
       const resolved = await Promise.all(
-        entries.map(async ([k, v]) => [k, isAssetRef(v) ? await getAsset(v) : v] as const),
+        entries.map(async ([k, v]) => {
+          if (!isAssetRef(v)) return [k, v] as const;
+          const dataUrl = await getAsset(v);
+          if (dataUrl === null) {
+            console.warn(`Asset store: card override "${k}" asset missing; clearing it.`);
+          }
+          return [k, dataUrl] as const;
+        }),
       );
       return { ...r, overrides: Object.fromEntries(resolved) };
     }),
