@@ -1,9 +1,15 @@
 import type { Template, CardRecord, ColumnMapping, PrintPreset, PrintSettings } from '../types';
 import type { ParsedCsv } from './csv';
 import { externalizeWorkspaceAssets } from './assetStore';
+import { createIdbTable } from './idbStore';
+import { STORE_NAMES } from './idbSchema';
 
+/** Legacy localStorage keys — kept exported only for storageMigration.ts to read from. */
 export const LIST_KEY = 'id_card_workspace_list';
 export const DATA_PREFIX = 'id_card_workspace_data_';
+
+/** Key the single workspace-list record is stored under in the `workspaceList` IndexedDB store. */
+const LIST_RECORD_KEY = 'current';
 
 export interface WorkspaceMeta {
   id: string;
@@ -42,19 +48,11 @@ export interface WorkspaceData {
   templateLinkedToParent?: boolean;
 }
 
-function safeParse<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+const listTable = createIdbTable<WorkspaceListState>(STORE_NAMES.workspaceList);
+const dataTable = createIdbTable<WorkspaceData>(STORE_NAMES.workspaceData);
 
-export function getWorkspaceList(): WorkspaceListState {
-  const raw = localStorage.getItem(LIST_KEY);
-  const fallback: WorkspaceListState = { currentId: '', workspaces: [] };
-  const parsed = safeParse<WorkspaceListState>(raw, fallback);
+export async function getWorkspaceList(): Promise<WorkspaceListState> {
+  const parsed = (await listTable.get(LIST_RECORD_KEY)) ?? { currentId: '', workspaces: [] };
   if (!parsed.workspaces?.length) {
     return { currentId: '', workspaces: [] };
   }
@@ -64,40 +62,27 @@ export function getWorkspaceList(): WorkspaceListState {
   return parsed;
 }
 
-export function saveWorkspaceList(state: WorkspaceListState): void {
-  try {
-    localStorage.setItem(LIST_KEY, JSON.stringify(state));
-  } catch {
-    console.warn('Storage quota exceeded: workspace list could not be saved.');
-  }
+export async function saveWorkspaceList(state: WorkspaceListState): Promise<boolean> {
+  const ok = await listTable.put(LIST_RECORD_KEY, state);
+  if (!ok) console.warn('Storage error: workspace list could not be saved.');
+  return ok;
 }
 
-export function getWorkspaceData(id: string): WorkspaceData | null {
-  const raw = localStorage.getItem(DATA_PREFIX + id);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as WorkspaceData;
-  } catch {
-    return null;
-  }
+export async function getWorkspaceData(id: string): Promise<WorkspaceData | null> {
+  return dataTable.get(id);
 }
 
 /**
  * Persists workspace data. Large data URLs (background/watermark images, card
  * photos) are swapped for IndexedDB-backed `asset:` refs first, so the
- * localStorage entry stays small. Returns false when the write still failed
- * (quota) — callers that create workspaces must abort and surface the error.
+ * stored entry stays small. Returns false when the write failed — callers
+ * that create workspaces must abort and surface the error.
  */
-export function saveWorkspaceData(id: string, data: WorkspaceData): boolean {
-  let ok = true;
-  try {
-    localStorage.setItem(DATA_PREFIX + id, JSON.stringify(externalizeWorkspaceAssets(data)));
-  } catch {
-    console.warn('Storage quota exceeded: workspace data could not be saved. Consider removing large images.');
-    ok = false;
-  }
+export async function saveWorkspaceData(id: string, data: WorkspaceData): Promise<boolean> {
+  const ok = await dataTable.put(id, externalizeWorkspaceAssets(data));
+  if (!ok) console.warn('Storage error: workspace data could not be saved. Consider removing large images.');
   if (data.logo !== undefined) {
-    updateWorkspaceMeta(id, { logo: data.logo });
+    await updateWorkspaceMeta(id, { logo: data.logo });
   }
   return ok;
 }
@@ -110,11 +95,12 @@ export function saveWorkspaceData(id: string, data: WorkspaceData): boolean {
  * detachment persists on the next save. Result may contain `asset:` refs;
  * resolve with `resolveWorkspaceAssets` before dispatching into app state.
  */
-export function getEffectiveWorkspaceData(id: string): WorkspaceData | null {
-  const data = getWorkspaceData(id);
+export async function getEffectiveWorkspaceData(id: string): Promise<WorkspaceData | null> {
+  const data = await getWorkspaceData(id);
   if (!data?.templateLinkedToParent) return data;
-  const parentId = getWorkspaceList().workspaces.find((w) => w.id === id)?.parentId;
-  const parent = parentId ? getWorkspaceData(parentId) : null;
+  const list = await getWorkspaceList();
+  const parentId = list.workspaces.find((w) => w.id === id)?.parentId;
+  const parent = parentId ? await getWorkspaceData(parentId) : null;
   if (!parent) return { ...data, templateLinkedToParent: false };
   return { ...data, template: parent.template };
 }
@@ -123,31 +109,31 @@ export function createWorkspaceId(): string {
   return `workspace-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export function createWorkspace(name: string, logo?: string): WorkspaceMeta {
-  const list = getWorkspaceList();
+export async function createWorkspace(name: string, logo?: string): Promise<WorkspaceMeta> {
+  const list = await getWorkspaceList();
   const id = createWorkspaceId();
   const meta: WorkspaceMeta = { id, name, ...(logo != null && logo !== '' && { logo }) };
   list.workspaces = [...list.workspaces, meta];
   list.currentId = id;
-  saveWorkspaceList(list);
+  await saveWorkspaceList(list);
   return meta;
 }
 
-export function renameWorkspace(id: string, name: string): void {
-  const list = getWorkspaceList();
+export async function renameWorkspace(id: string, name: string): Promise<void> {
+  const list = await getWorkspaceList();
   const idx = list.workspaces.findIndex((w) => w.id === id);
   if (idx >= 0) {
     list.workspaces = list.workspaces.slice();
     list.workspaces[idx] = { ...list.workspaces[idx], name };
-    saveWorkspaceList(list);
+    await saveWorkspaceList(list);
   }
 }
 
-export function updateWorkspaceMeta(
+export async function updateWorkspaceMeta(
   id: string,
   updates: { name?: string; logo?: string | null }
-): void {
-  const list = getWorkspaceList();
+): Promise<void> {
+  const list = await getWorkspaceList();
   const idx = list.workspaces.findIndex((w) => w.id === id);
   if (idx >= 0) {
     list.workspaces = list.workspaces.slice();
@@ -157,15 +143,15 @@ export function updateWorkspaceMeta(
       ...(updates.name !== undefined && { name: updates.name }),
       ...(updates.logo !== undefined && { logo: updates.logo || undefined }),
     };
-    saveWorkspaceList(list);
+    await saveWorkspaceList(list);
   }
 }
 
-export function setCurrentWorkspace(id: string): void {
-  const list = getWorkspaceList();
+export async function setCurrentWorkspace(id: string): Promise<void> {
+  const list = await getWorkspaceList();
   if (list.workspaces.some((w) => w.id === id)) {
     list.currentId = id;
-    saveWorkspaceList(list);
+    await saveWorkspaceList(list);
   }
 }
 
@@ -184,8 +170,9 @@ const emptyTemplate: Template = {
 };
 
 /** Returns the direct children of a parent workspace. */
-export function getChildWorkspaces(parentId: string): WorkspaceMeta[] {
-  return getWorkspaceList().workspaces.filter((w) => w.parentId === parentId);
+export async function getChildWorkspaces(parentId: string): Promise<WorkspaceMeta[]> {
+  const list = await getWorkspaceList();
+  return list.workspaces.filter((w) => w.parentId === parentId);
 }
 
 /**
@@ -193,8 +180,8 @@ export function getChildWorkspaces(parentId: string): WorkspaceMeta[] {
  * Pass `existingId` when the workspace's data was already persisted under a
  * pre-generated id (write-data-first creation flow).
  */
-export function createSubWorkspace(name: string, parentId: string, logo?: string, existingId?: string): WorkspaceMeta {
-  const list = getWorkspaceList();
+export async function createSubWorkspace(name: string, parentId: string, logo?: string, existingId?: string): Promise<WorkspaceMeta> {
+  const list = await getWorkspaceList();
   const parent = list.workspaces.find((w) => w.id === parentId);
   if (!parent) throw new Error(`createSubWorkspace: parent "${parentId}" not found`);
   if (parent.parentId) throw new Error(`createSubWorkspace: cannot nest sub-workspaces (parent "${parentId}" is already a child)`);
@@ -202,7 +189,7 @@ export function createSubWorkspace(name: string, parentId: string, logo?: string
   const meta: WorkspaceMeta = { id, name, parentId, ...(logo != null && logo !== '' && { logo }) };
   list.workspaces = [...list.workspaces, meta];
   list.currentId = id;
-  saveWorkspaceList(list);
+  await saveWorkspaceList(list);
   return meta;
 }
 
@@ -210,8 +197,8 @@ export function createSubWorkspace(name: string, parentId: string, logo?: string
  * Deletes a workspace and all its direct children.
  * After deletion the current workspace is reset to the first remaining workspace.
  */
-export function deleteWorkspaceTree(id: string): void {
-  const list = getWorkspaceList();
+export async function deleteWorkspaceTree(id: string): Promise<void> {
+  const list = await getWorkspaceList();
   const childIds = list.workspaces.filter((w) => w.parentId === id).map((w) => w.id);
   const toDelete = new Set([id, ...childIds]);
   list.workspaces = list.workspaces.filter((w) => !toDelete.has(w.id));
@@ -223,8 +210,13 @@ export function deleteWorkspaceTree(id: string): void {
       list.currentId = 'default';
     }
   }
-  saveWorkspaceList(list);
-  toDelete.forEach((delId) => localStorage.removeItem(DATA_PREFIX + delId));
+  await saveWorkspaceList(list);
+  await Promise.all([...toDelete].map((delId) => dataTable.delete(delId)));
+}
+
+/** Deletes a single workspace's stored data row (not the list entry). */
+export async function deleteWorkspaceData(id: string): Promise<void> {
+  await dataTable.delete(id);
 }
 
 /**
@@ -232,15 +224,15 @@ export function deleteWorkspaceTree(id: string): void {
  * Switches currentId to the new workspace.
  * parentId → creates as a sub-workspace; omit → creates as a root workspace.
  */
-export function duplicateWorkspace(
+export async function duplicateWorkspace(
   sourceId: string,
   newName: string,
   parentId?: string,
-): WorkspaceMeta {
+): Promise<WorkspaceMeta> {
   // Duplicate from the EFFECTIVE data so a linked sub-workspace's duplicate
   // captures the parent's current template as an independent snapshot —
   // carrying the link flag to a different parent would silently swap designs.
-  const raw = getEffectiveWorkspaceData(sourceId) ?? getDefaultWorkspaceData();
+  const raw = (await getEffectiveWorkspaceData(sourceId)) ?? getDefaultWorkspaceData();
   // Strip csvData from the copy — it can be large and is trivial to re-upload.
   const { csvData: _csv, templateLinkedToParent: _linked, ...sourceData } = raw;
   const newId = createWorkspaceId();
@@ -250,11 +242,11 @@ export function duplicateWorkspace(
     ...(parentId ? { parentId } : {}),
     ...(sourceData.logo ? { logo: sourceData.logo } : {}),
   };
-  const list = getWorkspaceList();
+  const list = await getWorkspaceList();
   list.workspaces = [...list.workspaces, meta];
   list.currentId = newId;
-  saveWorkspaceList(list);
-  saveWorkspaceData(newId, sourceData);
+  await saveWorkspaceList(list);
+  await saveWorkspaceData(newId, sourceData);
   return meta;
 }
 

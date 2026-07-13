@@ -141,7 +141,7 @@ export default function PrintSettingsComponent({
     // For 'custom': keep the current dimensions as the starting point; user edits the fields below.
   };
 
-  const handleSavePreset = () => {
+  const handleSavePreset = async () => {
     const name = prompt('Preset name');
     if (!name?.trim()) return;
     const preset: PrintPreset = {
@@ -156,8 +156,8 @@ export default function PrintSettingsComponent({
       cardGapMm: settings.cardGapMm,
       paperOrientation: settings.paperOrientation,
     };
-    savePrintPreset(preset);
-    onPresetsChange(loadPrintPresets());
+    await savePrintPreset(preset);
+    onPresetsChange(await loadPrintPresets());
   };
 
   const handleUsePreset = (p: PrintPreset) => {
@@ -176,9 +176,9 @@ export default function PrintSettingsComponent({
     }
   };
 
-  const handleDeletePreset = (id: string) => {
-    deletePrintPreset(id);
-    onPresetsChange(loadPrintPresets());
+  const handleDeletePreset = async (id: string) => {
+    await deletePrintPreset(id);
+    onPresetsChange(await loadPrintPresets());
   };
 
   // Compute layout summary using effective paper dims

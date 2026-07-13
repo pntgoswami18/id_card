@@ -18,7 +18,7 @@ This layer is the single source of truth for all shared app state. It uses React
 | `currentWorkspaceId` | ID of the active workspace. |
 | `workspaceList` | `WorkspaceMeta[]` for the workspace switcher UI. |
 | `currentWorkspaceLogo` | Data URL or image URL for the workspace logo. Optional. |
-| `csvData` | Parsed CSV for the Data step. Persisted to localStorage; stripped from `.idcard` exports and workspace duplicates. See below. |
+| `csvData` | Parsed CSV for the Data step. Persisted as part of `WorkspaceData` (IndexedDB, via `workspaceStorage.ts`); stripped from `.idcard` exports and workspace duplicates. See below. |
 | `templateLinkedToParent` | Copy-on-write template inheritance: `true` while a sub-workspace tracks its parent's template. **Cleared automatically by every template mutation action** (`SET_TEMPLATE`, `UPDATE_TEMPLATE_ELEMENT(S)`, `UPDATE_TEMPLATE_BACKGROUND`, `UPDATE_TEMPLATE_WATERMARK`) — that's the detach mechanism; do not add a template mutation action without clearing it. Persisted in `WorkspaceData`; `LOAD_WORKSPACE_STATE` restores it (`?? false`). The template in state is always the *effective* one (parent's, when linked) — `getEffectiveWorkspaceData` in `workspaceStorage.ts` does the overlay at load time. |
 
 ## Actions
@@ -75,7 +75,7 @@ Restores a saved workspace in one dispatch. Each field is applied only if presen
 
 ## csvData persistence
 
-`csvData` is written to localStorage as part of normal workspace auto-save, so column-mapping survives a page reload or workspace switch. It is **not** included in `.idcard` file exports (stripped by `buildFileContent`) or in workspace duplicates (stripped by `duplicateWorkspace`). Opening a `.idcard` file sets `csvData` to `null` because the key is absent from the file payload.
+`csvData` is written to IndexedDB (via `saveWorkspaceData`) as part of normal workspace auto-save, so column-mapping survives a page reload or workspace switch. It is **not** included in `.idcard` file exports (stripped by `buildFileContent`) or in workspace duplicates (stripped by `duplicateWorkspace`). Opening a `.idcard` file sets `csvData` to `null` because the key is absent from the file payload.
 
 `SET_RECORDS` with an empty payload clears `csvData` as a side effect (workspace load resets both). `SET_CSV_DATA` is the explicit setter.
 

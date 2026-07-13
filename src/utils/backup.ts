@@ -1,8 +1,8 @@
-import { getWorkspaceList, getWorkspaceData, saveWorkspaceData, LIST_KEY } from './workspaceStorage';
+import { getWorkspaceList, getWorkspaceData, saveWorkspaceData, saveWorkspaceList } from './workspaceStorage';
 import { resolveWorkspaceAssets } from './assetStore';
 import { loadResolvedUserTemplates, restoreUserTemplates } from './userTemplates';
 import type { UserTemplateEntry } from './userTemplates';
-import { loadPrintPresets, STORAGE_KEY as PRINT_PRESETS_KEY } from './printPresets';
+import { loadPrintPresets, replacePrintPresets } from './printPresets';
 import type { WorkspaceListState, WorkspaceData } from './workspaceStorage';
 import type { PrintPreset } from '../types';
 
@@ -30,10 +30,10 @@ export function isBackupData(obj: unknown): obj is BackupData {
 }
 
 export async function createBackup(): Promise<BackupData> {
-  const workspaceList = getWorkspaceList();
+  const workspaceList = await getWorkspaceList();
   const workspaceData: Record<string, WorkspaceData> = {};
   for (const w of workspaceList.workspaces) {
-    const data = getWorkspaceData(w.id);
+    const data = await getWorkspaceData(w.id);
     if (data) {
       // Resolve asset: refs so the backup JSON is self-contained.
       workspaceData[w.id] = await resolveWorkspaceAssets(data);
@@ -41,7 +41,7 @@ export async function createBackup(): Promise<BackupData> {
   }
   // Resolve asset: refs so template images in the backup JSON are self-contained.
   const userTemplates = await loadResolvedUserTemplates();
-  const printPresets = loadPrintPresets();
+  const printPresets = await loadPrintPresets();
 
   return {
     version: 1,
@@ -69,7 +69,7 @@ export async function downloadBackup(): Promise<void> {
 
 export type RestoreResult = { ok: true } | { ok: false; error: string };
 
-export function restoreFromBackup(backup: BackupData): RestoreResult {
+export async function restoreFromBackup(backup: BackupData): Promise<RestoreResult> {
   try {
     if (!isBackupData(backup)) {
       return { ok: false, error: 'Invalid backup file format.' };
@@ -83,14 +83,16 @@ export function restoreFromBackup(backup: BackupData): RestoreResult {
       workspaceList.currentId = workspaceList.workspaces.length > 0 ? workspaceList.workspaces[0].id : '';
     }
 
-    localStorage.setItem(LIST_KEY, JSON.stringify(workspaceList));
+    if (!(await saveWorkspaceList(workspaceList))) {
+      return { ok: false, error: 'Browser storage is full — the backup could not be fully restored.' };
+    }
 
     for (const [id, data] of Object.entries(workspaceData)) {
       if (!knownIds.has(id)) continue; // skip unrecognized keys
       if (data && typeof data === 'object' && data.template && Array.isArray(data.records)) {
         // Route through saveWorkspaceData so large data URLs in the backup are
         // externalized to the asset store instead of hitting the localStorage quota.
-        if (!saveWorkspaceData(id, data)) {
+        if (!(await saveWorkspaceData(id, data))) {
           return { ok: false, error: 'Browser storage is full — the backup could not be fully restored.' };
         }
       }
@@ -98,10 +100,12 @@ export function restoreFromBackup(backup: BackupData): RestoreResult {
 
     // Route through restoreUserTemplates so large template images are
     // externalized to the asset store instead of hitting the localStorage quota.
-    if (!restoreUserTemplates(userTemplates as UserTemplateEntry[])) {
+    if (!(await restoreUserTemplates(userTemplates as UserTemplateEntry[]))) {
       return { ok: false, error: 'Browser storage is full — user templates could not be fully restored.' };
     }
-    localStorage.setItem(PRINT_PRESETS_KEY, JSON.stringify(printPresets));
+    if (!(await replacePrintPresets(printPresets))) {
+      return { ok: false, error: 'Browser storage is full — print presets could not be fully restored.' };
+    }
 
     return { ok: true };
   } catch (err) {

@@ -35,7 +35,6 @@ import SubdirectoryArrowRight from '@mui/icons-material/SubdirectoryArrowRight';
 import CreateNewFolder from '@mui/icons-material/CreateNewFolder';
 import type { WorkspaceMeta, WorkspaceData } from '../utils/workspaceStorage';
 import {
-  DATA_PREFIX,
   getWorkspaceList,
   getWorkspaceData,
   getEffectiveWorkspaceData,
@@ -44,6 +43,7 @@ import {
   saveWorkspaceList,
   createSubWorkspace,
   deleteWorkspaceTree,
+  deleteWorkspaceData,
   renameWorkspace,
   updateWorkspaceMeta,
   getDefaultWorkspaceData,
@@ -73,7 +73,7 @@ interface WorkspaceSwitcherProps {
   fileHandleRef: React.MutableRefObject<Map<string, WorkspaceFileHandle>>;
   /** Bumped by App.tsx after async-rehydrating fileHandleRef from IndexedDB, so the handle-sync effect re-runs. */
   handleRehydrationTick: number;
-  onSaveCurrent: (overrides?: Partial<WorkspaceData>) => void;
+  onSaveCurrent: (overrides?: Partial<WorkspaceData>) => Promise<void>;
   onLoadWorkspace: (data: WorkspaceData) => void;
   onSetCurrentWorkspace: (id: string) => void;
   onSetWorkspaceList: (list: WorkspaceMeta[]) => void;
@@ -280,11 +280,11 @@ export default function WorkspaceSwitcher({
 
   // ---- Switch ----
   const doSwitch = async (id: string) => {
-    onSaveCurrent();
-    const list = getWorkspaceList();
+    await onSaveCurrent();
+    const list = await getWorkspaceList();
     list.currentId = id;
-    saveWorkspaceList(list);
-    const data = getEffectiveWorkspaceData(id);
+    await saveWorkspaceList(list);
+    const data = await getEffectiveWorkspaceData(id);
     // Resolve asset refs BEFORE any dispatch: all three dispatches must land in one
     // render batch so onLoadWorkspace's autosave skip-flag covers the id change too.
     const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
@@ -333,7 +333,7 @@ export default function WorkspaceSwitcher({
     const logo = newLogo ?? undefined;
     setNewOpen(false); // close the normal dialog before the OS file picker opens
 
-    onSaveCurrent();
+    await onSaveCurrent();
 
     const defaultData = { ...getDefaultWorkspaceData(), logo };
     const handle = await saveWorkspaceWithPicker(name, defaultData);
@@ -343,12 +343,12 @@ export default function WorkspaceSwitcher({
     // On non-FSA browsers saveWorkspaceWithPicker triggers a download and returns null, so proceed.
     if (handle === null && hasSaveFilePicker()) return;
 
-    const meta = createWorkspace(name, logo);
-    const list = getWorkspaceList();
+    const meta = await createWorkspace(name, logo);
+    const list = await getWorkspaceList();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(meta.id);
     onLoadWorkspace(defaultData);
-    saveWorkspaceData(meta.id, { ...defaultData, csvData: null });
+    await saveWorkspaceData(meta.id, { ...defaultData, csvData: null });
     if (handle) {
       setHandleForRoot(meta.id, handle);
     }
@@ -370,9 +370,9 @@ export default function WorkspaceSwitcher({
     const name = newSubName.trim();
     if (!name || !newSubParentId) return;
     const logo = newSubLogo ?? undefined;
-    onSaveCurrent();
+    await onSaveCurrent();
     let initialData = getDefaultWorkspaceData();
-    const parentData = getWorkspaceData(newSubParentId);
+    const parentData = await getWorkspaceData(newSubParentId);
     if (parentData) {
       // Stored parent data may hold asset: refs — resolve so in-memory state gets real data URLs.
       const resolved = await resolveWorkspaceAssets(parentData);
@@ -391,12 +391,12 @@ export default function WorkspaceSwitcher({
     // write aborts creation instead of leaving a workspace that silently lost
     // its inherited template.
     const newId = createWorkspaceId();
-    if (!saveWorkspaceData(newId, { ...initialData, logo })) {
+    if (!(await saveWorkspaceData(newId, { ...initialData, logo }))) {
       setNewSubError('Could not create the sub-workspace: browser storage is full. Delete unused workspaces or remove large images, then try again.');
       return;
     }
-    const meta = createSubWorkspace(name, newSubParentId, logo, newId);
-    const list = getWorkspaceList();
+    const meta = await createSubWorkspace(name, newSubParentId, logo, newId);
+    const list = await getWorkspaceList();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(meta.id);
     onLoadWorkspace({ ...initialData, logo });
@@ -417,15 +417,15 @@ export default function WorkspaceSwitcher({
     handleClose();
   };
 
-  const handleEditConfirm = () => {
+  const handleEditConfirm = async () => {
     if (!currentWorkspaceId) return;
     const name = editName.trim() || (currentMeta?.name ?? 'Workspace');
     const logo = editLogo ?? undefined;
-    renameWorkspace(currentWorkspaceId, name);
-    updateWorkspaceMeta(currentWorkspaceId, { logo });
+    await renameWorkspace(currentWorkspaceId, name);
+    await updateWorkspaceMeta(currentWorkspaceId, { logo });
     onSetWorkspaceLogo(logo);
-    onSaveCurrent({ logo });
-    const list = getWorkspaceList();
+    await onSaveCurrent({ logo });
+    const list = await getWorkspaceList();
     onSetWorkspaceList(list.workspaces);
     setEditOpen(false); setEditName(''); setEditLogo(null);
   };
@@ -436,10 +436,10 @@ export default function WorkspaceSwitcher({
   const handleDeleteConfirm = async () => {
     if (!currentWorkspaceId) return;
     clearHandleForRoot(currentRootId);
-    onSaveCurrent();
-    deleteWorkspaceTree(currentWorkspaceId);
-    const list = getWorkspaceList();
-    const data = getEffectiveWorkspaceData(list.currentId);
+    await onSaveCurrent();
+    await deleteWorkspaceTree(currentWorkspaceId);
+    const list = await getWorkspaceList();
+    const data = await getEffectiveWorkspaceData(list.currentId);
     const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(list.currentId);
@@ -454,19 +454,19 @@ export default function WorkspaceSwitcher({
     handleClose();
     setSaving(true);
     try {
-      onSaveCurrent(); // flush current to localStorage before reading child data
+      await onSaveCurrent(); // flush current before reading child data
 
       // Always save from the root perspective so children are included.
       // Resolve asset: refs so the .idcard file is self-contained.
       const rootId = currentMeta?.parentId ?? currentWorkspaceId;
       const rootMeta = workspaceList.find((w) => w.id === rootId);
-      const rootData = await resolveWorkspaceAssets(getWorkspaceData(rootId) ?? getDefaultWorkspaceData());
+      const rootData = await resolveWorkspaceAssets((await getWorkspaceData(rootId)) ?? getDefaultWorkspaceData());
       const rootName = rootMeta?.name ?? 'Workspace';
 
       const childMetas = workspaceList.filter((w) => w.parentId === rootId);
       const children = await Promise.all(childMetas.map(async (meta) => ({
         meta: { name: meta.name, ...(meta.logo ? { logo: meta.logo } : {}) },
-        data: await resolveWorkspaceAssets(getWorkspaceData(meta.id) ?? getDefaultWorkspaceData()),
+        data: await resolveWorkspaceAssets((await getWorkspaceData(meta.id)) ?? getDefaultWorkspaceData()),
       })));
 
       const existingHandle = fileHandleRef.current.get(rootId);
@@ -514,19 +514,19 @@ export default function WorkspaceSwitcher({
     return null;
   };
 
-  const restoreWorkspaceFile = (wsFile: import('../utils/workspaceFile').WorkspaceFile) => {
-    onSaveCurrent(); // flush any unsaved in-memory edits before switching away
+  const restoreWorkspaceFile = async (wsFile: import('../utils/workspaceFile').WorkspaceFile) => {
+    await onSaveCurrent(); // flush any unsaved in-memory edits before switching away
 
     // Sync user templates embedded in the imported file into the local user-templates store
     // so they appear in the "My templates" section of the Start From Template modal.
     // This handles the case where the file was created on a different machine (or after
     // localStorage was cleared) where the originating user templates don't exist locally.
-    const existingIds = new Set(loadUserTemplates().map((t) => t.meta.id));
-    const syncTemplate = (data: WorkspaceData) => {
+    const existingIds = new Set((await loadUserTemplates()).map((t) => t.meta.id));
+    const syncTemplate = async (data: WorkspaceData) => {
       if (data.currentTemplateSource?.type === 'user' && data.template) {
         const id = data.currentTemplateSource.id;
         if (!existingIds.has(id)) {
-          if (!saveUserTemplate(data.template)) {
+          if (!(await saveUserTemplate(data.template))) {
             setTemplateSyncError(
               'Browser storage is full — templates from the opened file could not be added to "My templates". The workspace itself opened fine.',
             );
@@ -535,16 +535,18 @@ export default function WorkspaceSwitcher({
         }
       }
     };
-    syncTemplate(wsFile.data);
-    wsFile.children?.forEach((child) => syncTemplate(child.data));
+    await syncTemplate(wsFile.data);
+    for (const child of wsFile.children ?? []) {
+      await syncTemplate(child.data);
+    }
 
     // Create a fresh root workspace entry so the opened file never clobbers an existing workspace.
     const rootId = createWorkspaceId();
     const rootEntry: WorkspaceMeta = { id: rootId, name: wsFile.name };
-    const list = getWorkspaceList();
+    const list = await getWorkspaceList();
     const newWorkspaces: WorkspaceMeta[] = [...list.workspaces, rootEntry];
 
-    saveWorkspaceData(rootId, wsFile.data);
+    await saveWorkspaceData(rootId, wsFile.data);
 
     if (wsFile.children && wsFile.children.length > 0) {
       for (const child of wsFile.children) {
@@ -556,13 +558,13 @@ export default function WorkspaceSwitcher({
           ...(child.meta.logo ? { logo: child.meta.logo } : {}),
         };
         newWorkspaces.push(childEntry);
-        saveWorkspaceData(childId, child.data);
+        await saveWorkspaceData(childId, child.data);
       }
     }
 
     list.workspaces = newWorkspaces;
     list.currentId = rootId;
-    saveWorkspaceList(list);
+    await saveWorkspaceList(list);
 
     onSetWorkspaceList(newWorkspaces);
     onSetCurrentWorkspace(rootId);
@@ -586,7 +588,7 @@ export default function WorkspaceSwitcher({
       }
       const wsFile = await readWorkspaceFile(result.file);
       if (wsFile) {
-        const newRootId = restoreWorkspaceFile(wsFile);
+        const newRootId = await restoreWorkspaceFile(wsFile);
         setHandleForRoot(newRootId, result.handle);
       } else {
         setOpenError('Invalid workspace file. Please select a valid .idcard file.');
@@ -605,7 +607,7 @@ export default function WorkspaceSwitcher({
       setOpenError('Invalid workspace file. Please select a valid .idcard file.');
       return;
     }
-    restoreWorkspaceFile(wsFile);
+    await restoreWorkspaceFile(wsFile);
   };
 
   // ---- Duplicate root workspace ----
@@ -618,10 +620,10 @@ export default function WorkspaceSwitcher({
   const handleDupRootConfirm = async () => {
     const name = dupRootName.trim();
     if (!name) return;
-    onSaveCurrent();
-    const meta = duplicateWorkspace(currentWorkspaceId, name);
-    const list = getWorkspaceList();
-    const data = getWorkspaceData(meta.id);
+    await onSaveCurrent();
+    const meta = await duplicateWorkspace(currentWorkspaceId, name);
+    const list = await getWorkspaceList();
+    const data = await getWorkspaceData(meta.id);
     const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(meta.id);
@@ -646,7 +648,7 @@ export default function WorkspaceSwitcher({
     const name = dupSubName.trim();
     if (!name || !currentMeta?.parentId) return;
 
-    onSaveCurrent();
+    await onSaveCurrent();
 
     let targetParentId = currentMeta.parentId;
     let createdNewParentId: string | null = null;
@@ -662,17 +664,17 @@ export default function WorkspaceSwitcher({
       // duplicateWorkspace will set currentId to the final duplicate in one go.
       const newParentId = createWorkspaceId();
       const newParentMeta: WorkspaceMeta = { id: newParentId, name: newParentName };
-      const list = getWorkspaceList();
+      const list = await getWorkspaceList();
       list.workspaces = [...list.workspaces, newParentMeta];
-      saveWorkspaceList(list);
-      saveWorkspaceData(newParentId, getDefaultWorkspaceData());
+      await saveWorkspaceList(list);
+      await saveWorkspaceData(newParentId, getDefaultWorkspaceData());
       createdNewParentId = newParentId;
       targetParentId = newParentId;
     }
 
-    const meta = duplicateWorkspace(currentWorkspaceId, name, targetParentId);
-    const list = getWorkspaceList();
-    const data = getWorkspaceData(meta.id);
+    const meta = await duplicateWorkspace(currentWorkspaceId, name, targetParentId);
+    const list = await getWorkspaceList();
+    const data = await getWorkspaceData(meta.id);
     const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
     onSetWorkspaceList(list.workspaces);
     onSetCurrentWorkspace(meta.id);
@@ -686,10 +688,10 @@ export default function WorkspaceSwitcher({
     } catch (err) {
       // Roll back the new parent workspace if it was written but the duplicate failed.
       if (createdNewParentId) {
-        const list = getWorkspaceList();
+        const list = await getWorkspaceList();
         list.workspaces = list.workspaces.filter((w) => w.id !== createdNewParentId);
-        saveWorkspaceList(list);
-        localStorage.removeItem(DATA_PREFIX + createdNewParentId);
+        await saveWorkspaceList(list);
+        await deleteWorkspaceData(createdNewParentId);
       }
       console.error('Duplicate sub-workspace failed:', err);
       alert(`Could not duplicate: ${err instanceof Error ? err.message : 'Unknown error'}`);

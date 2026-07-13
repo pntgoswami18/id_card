@@ -215,7 +215,7 @@ export default function DesignStep() {
   const handleSave = async () => {
     if (!canSaveOverwrite) return;
     const toSave: Template = { ...template, id: template.id, name: template.name, orientation: printSettings.orientation };
-    if (!saveUserTemplate(toSave)) {
+    if (!(await saveUserTemplate(toSave))) {
       setTemplateSaveError('Browser storage is full — the template could not be saved. Try deleting unused templates or workspaces.');
     }
     await saveTemplateWithPicker(toSave.name, toSave);
@@ -225,8 +225,8 @@ export default function DesignStep() {
     const name = saveTemplateName.trim() || 'My Template';
     const id = `user-${Date.now()}`;
     const toSave: Template = { ...template, id, name, orientation: printSettings.orientation };
-    // Always save to localStorage so it appears in TemplatePicker
-    if (!saveUserTemplate(toSave)) {
+    // Always save so it appears in TemplatePicker
+    if (!(await saveUserTemplate(toSave))) {
       setTemplateSaveError('Browser storage is full — the template could not be saved to "My templates". Try deleting unused templates or workspaces.');
     }
     // Update both template id and source so subsequent "Save" overwrites the right key

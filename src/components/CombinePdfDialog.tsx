@@ -81,7 +81,9 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
   useEffect(() => {
     if (!open) return;
     // Reset transient state when (re)opening.
-    setWorkspaces(getWorkspaceList().workspaces.map((w) => ({ id: w.id, name: w.name })));
+    void getWorkspaceList().then((list) => {
+      setWorkspaces(list.workspaces.map((w) => ({ id: w.id, name: w.name })));
+    });
     setSelectedIds(new Set());
     setImportedSized([]);
     setImportedUnsized([]);
@@ -131,7 +133,7 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
     // First pass: total card count for progress.
     const plans = (await Promise.all(
       Array.from(selectedIds).map(async (id) => {
-        const raw = getEffectiveWorkspaceData(id);
+        const raw = await getEffectiveWorkspaceData(id);
         if (!raw || raw.records.length === 0) return null;
         // Stored data may hold asset: refs — resolve before rendering cards.
         const data = await resolveWorkspaceAssets(raw);
