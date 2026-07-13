@@ -1,4 +1,5 @@
-import { getWorkspaceList, getWorkspaceData, LIST_KEY, DATA_PREFIX } from './workspaceStorage';
+import { getWorkspaceList, getWorkspaceData, saveWorkspaceData, LIST_KEY } from './workspaceStorage';
+import { resolveWorkspaceAssets } from './assetStore';
 import { loadUserTemplates, STORAGE_KEY as USER_TEMPLATES_KEY } from './userTemplates';
 import { loadPrintPresets, STORAGE_KEY as PRINT_PRESETS_KEY } from './printPresets';
 import type { WorkspaceListState, WorkspaceData } from './workspaceStorage';
@@ -27,13 +28,14 @@ export function isBackupData(obj: unknown): obj is BackupData {
   );
 }
 
-export function createBackup(): BackupData {
+export async function createBackup(): Promise<BackupData> {
   const workspaceList = getWorkspaceList();
   const workspaceData: Record<string, WorkspaceData> = {};
   for (const w of workspaceList.workspaces) {
     const data = getWorkspaceData(w.id);
     if (data) {
-      workspaceData[w.id] = data;
+      // Resolve asset: refs so the backup JSON is self-contained.
+      workspaceData[w.id] = await resolveWorkspaceAssets(data);
     }
   }
   const userTemplates = loadUserTemplates();
@@ -50,8 +52,8 @@ export function createBackup(): BackupData {
   };
 }
 
-export function downloadBackup(): void {
-  const backup = createBackup();
+export async function downloadBackup(): Promise<void> {
+  const backup = await createBackup();
   const blob = new Blob([JSON.stringify(backup, null, 2)], {
     type: 'application/json',
   });
@@ -84,7 +86,11 @@ export function restoreFromBackup(backup: BackupData): RestoreResult {
     for (const [id, data] of Object.entries(workspaceData)) {
       if (!knownIds.has(id)) continue; // skip unrecognized keys
       if (data && typeof data === 'object' && data.template && Array.isArray(data.records)) {
-        localStorage.setItem(DATA_PREFIX + id, JSON.stringify(data));
+        // Route through saveWorkspaceData so large data URLs in the backup are
+        // externalized to the asset store instead of hitting the localStorage quota.
+        if (!saveWorkspaceData(id, data)) {
+          return { ok: false, error: 'Browser storage is full — the backup could not be fully restored.' };
+        }
       }
     }
 

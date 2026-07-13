@@ -1,5 +1,6 @@
 import type { Template, CardRecord, ColumnMapping, PrintPreset, PrintSettings } from '../types';
 import type { ParsedCsv } from './csv';
+import { externalizeWorkspaceAssets } from './assetStore';
 
 export const LIST_KEY = 'id_card_workspace_list';
 export const DATA_PREFIX = 'id_card_workspace_data_';
@@ -31,6 +32,14 @@ export interface WorkspaceData {
   logo?: string;
   /** Parsed CSV retained so the Data step can show column-mapping on reload. */
   csvData?: ParsedCsv | null;
+  /**
+   * Copy-on-write template inheritance for sub-workspaces: while true, the
+   * effective template is the parent's current template (see
+   * getEffectiveWorkspaceData) and this workspace's own `template` is only a
+   * fallback snapshot. Any template edit in the reducer clears the flag,
+   * detaching the workspace into an independent copy.
+   */
+  templateLinkedToParent?: boolean;
 }
 
 function safeParse<T>(raw: string | null, fallback: T): T {
@@ -73,15 +82,41 @@ export function getWorkspaceData(id: string): WorkspaceData | null {
   }
 }
 
-export function saveWorkspaceData(id: string, data: WorkspaceData): void {
+/**
+ * Persists workspace data. Large data URLs (background/watermark images, card
+ * photos) are swapped for IndexedDB-backed `asset:` refs first, so the
+ * localStorage entry stays small. Returns false when the write still failed
+ * (quota) — callers that create workspaces must abort and surface the error.
+ */
+export function saveWorkspaceData(id: string, data: WorkspaceData): boolean {
+  let ok = true;
   try {
-    localStorage.setItem(DATA_PREFIX + id, JSON.stringify(data));
+    localStorage.setItem(DATA_PREFIX + id, JSON.stringify(externalizeWorkspaceAssets(data)));
   } catch {
     console.warn('Storage quota exceeded: workspace data could not be saved. Consider removing large images.');
+    ok = false;
   }
   if (data.logo !== undefined) {
     updateWorkspaceMeta(id, { logo: data.logo });
   }
+  return ok;
+}
+
+/**
+ * Returns workspace data with the copy-on-write template link applied: when
+ * `templateLinkedToParent` is set and the parent exists, the parent's current
+ * template overlays this workspace's own snapshot. Falls back to a detached
+ * copy (flag cleared, own snapshot kept) when the parent is missing — the
+ * detachment persists on the next save. Result may contain `asset:` refs;
+ * resolve with `resolveWorkspaceAssets` before dispatching into app state.
+ */
+export function getEffectiveWorkspaceData(id: string): WorkspaceData | null {
+  const data = getWorkspaceData(id);
+  if (!data?.templateLinkedToParent) return data;
+  const parentId = getWorkspaceList().workspaces.find((w) => w.id === id)?.parentId;
+  const parent = parentId ? getWorkspaceData(parentId) : null;
+  if (!parent) return { ...data, templateLinkedToParent: false };
+  return { ...data, template: parent.template };
 }
 
 export function createWorkspaceId(): string {
@@ -153,13 +188,17 @@ export function getChildWorkspaces(parentId: string): WorkspaceMeta[] {
   return getWorkspaceList().workspaces.filter((w) => w.parentId === parentId);
 }
 
-/** Creates a sub-workspace under the given parent. Switches to it as current. */
-export function createSubWorkspace(name: string, parentId: string, logo?: string): WorkspaceMeta {
+/**
+ * Creates a sub-workspace under the given parent. Switches to it as current.
+ * Pass `existingId` when the workspace's data was already persisted under a
+ * pre-generated id (write-data-first creation flow).
+ */
+export function createSubWorkspace(name: string, parentId: string, logo?: string, existingId?: string): WorkspaceMeta {
   const list = getWorkspaceList();
   const parent = list.workspaces.find((w) => w.id === parentId);
   if (!parent) throw new Error(`createSubWorkspace: parent "${parentId}" not found`);
   if (parent.parentId) throw new Error(`createSubWorkspace: cannot nest sub-workspaces (parent "${parentId}" is already a child)`);
-  const id = createWorkspaceId();
+  const id = existingId ?? createWorkspaceId();
   const meta: WorkspaceMeta = { id, name, parentId, ...(logo != null && logo !== '' && { logo }) };
   list.workspaces = [...list.workspaces, meta];
   list.currentId = id;
@@ -198,9 +237,12 @@ export function duplicateWorkspace(
   newName: string,
   parentId?: string,
 ): WorkspaceMeta {
-  const raw = getWorkspaceData(sourceId) ?? getDefaultWorkspaceData();
+  // Duplicate from the EFFECTIVE data so a linked sub-workspace's duplicate
+  // captures the parent's current template as an independent snapshot —
+  // carrying the link flag to a different parent would silently swap designs.
+  const raw = getEffectiveWorkspaceData(sourceId) ?? getDefaultWorkspaceData();
   // Strip csvData from the copy — it can be large and is trivial to re-upload.
-  const { csvData: _csv, ...sourceData } = raw;
+  const { csvData: _csv, templateLinkedToParent: _linked, ...sourceData } = raw;
   const newId = createWorkspaceId();
   const meta: WorkspaceMeta = {
     id: newId,

@@ -19,6 +19,7 @@ This layer is the single source of truth for all shared app state. It uses React
 | `workspaceList` | `WorkspaceMeta[]` for the workspace switcher UI. |
 | `currentWorkspaceLogo` | Data URL or image URL for the workspace logo. Optional. |
 | `csvData` | Parsed CSV for the Data step. Persisted to localStorage; stripped from `.idcard` exports and workspace duplicates. See below. |
+| `templateLinkedToParent` | Copy-on-write template inheritance: `true` while a sub-workspace tracks its parent's template. **Cleared automatically by every template mutation action** (`SET_TEMPLATE`, `UPDATE_TEMPLATE_ELEMENT(S)`, `UPDATE_TEMPLATE_BACKGROUND`, `UPDATE_TEMPLATE_WATERMARK`) — that's the detach mechanism; do not add a template mutation action without clearing it. Persisted in `WorkspaceData`; `LOAD_WORKSPACE_STATE` restores it (`?? false`). The template in state is always the *effective* one (parent's, when linked) — `getEffectiveWorkspaceData` in `workspaceStorage.ts` does the overlay at load time. |
 
 ## Actions
 
