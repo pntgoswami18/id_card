@@ -127,7 +127,8 @@ export async function getAsset(ref: string): Promise<string | null> {
   return fromDb;
 }
 
-function externalizeTemplate(template: Template): Template {
+/** Template-level externalize — same swap as `externalizeWorkspaceAssets`, for user-template persistence. */
+export function externalizeTemplateAssets(template: Template): Template {
   let out = template;
   if (out.background && shouldExternalize(out.background.value)) {
     out = { ...out, background: { ...out.background, value: storeAssetSync(out.background.value) } };
@@ -158,13 +159,14 @@ function externalizeRecords(records: CardRecord[]): CardRecord[] {
  * background. Idempotent: values that are already refs pass through untouched.
  */
 export function externalizeWorkspaceAssets(data: WorkspaceData): WorkspaceData {
-  const template = data.template ? externalizeTemplate(data.template) : data.template;
+  const template = data.template ? externalizeTemplateAssets(data.template) : data.template;
   const records = data.records ? externalizeRecords(data.records) : data.records;
   if (template === data.template && records === data.records) return data;
   return { ...data, template, records };
 }
 
-async function resolveTemplate(template: Template): Promise<Template> {
+/** Template-level resolve — must be awaited before a stored user template enters app state or a self-contained artifact. */
+export async function resolveTemplateAssets(template: Template): Promise<Template> {
   let out = template;
   if (out.background && isAssetRef(out.background.value)) {
     const dataUrl = await getAsset(out.background.value);
@@ -214,7 +216,7 @@ async function resolveRecords(records: CardRecord[]): Promise<CardRecord[]> {
  * refs (pre-migration or freshly edited in-memory state) passes through as-is.
  */
 export async function resolveWorkspaceAssets(data: WorkspaceData): Promise<WorkspaceData> {
-  const template = data.template ? await resolveTemplate(data.template) : data.template;
+  const template = data.template ? await resolveTemplateAssets(data.template) : data.template;
   const records = data.records ? await resolveRecords(data.records) : data.records;
   if (template === data.template && records === data.records) return data;
   return { ...data, template, records };

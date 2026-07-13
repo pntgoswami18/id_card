@@ -145,6 +145,7 @@ export default function WorkspaceSwitcher({
   const [dupSubNewParentName, setDupSubNewParentName] = useState('');
   // misc
   const [openError, setOpenError] = useState<string | null>(null);
+  const [templateSyncError, setTemplateSyncError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const openFileInputId = useId();
@@ -525,7 +526,11 @@ export default function WorkspaceSwitcher({
       if (data.currentTemplateSource?.type === 'user' && data.template) {
         const id = data.currentTemplateSource.id;
         if (!existingIds.has(id)) {
-          saveUserTemplate(data.template);
+          if (!saveUserTemplate(data.template)) {
+            setTemplateSyncError(
+              'Browser storage is full — templates from the opened file could not be added to "My templates". The workspace itself opened fine.',
+            );
+          }
           existingIds.add(id);
         }
       }
@@ -899,6 +904,18 @@ export default function WorkspaceSwitcher({
             <Button onClick={() => setOpenError(null)}>OK</Button>
           </DialogActions>
         </Dialog>
+
+        {/* ---- Template sync failure (opened file) ---- */}
+        <Snackbar
+          open={templateSyncError !== null}
+          autoHideDuration={8000}
+          onClose={() => setTemplateSyncError(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert severity="error" variant="filled" onClose={() => setTemplateSyncError(null)}>
+            {templateSyncError}
+          </Alert>
+        </Snackbar>
 
         {/* ---- Reconnect banner ---- */}
         <Snackbar

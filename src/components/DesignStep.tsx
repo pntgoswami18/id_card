@@ -13,6 +13,8 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Divider from '@mui/material/Divider';
 import Menu from '@mui/material/Menu';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
@@ -41,6 +43,7 @@ export default function DesignStep() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveTemplateName, setSaveTemplateName] = useState('');
   const [saveMenuAnchor, setSaveMenuAnchor] = useState<null | HTMLElement>(null);
+  const [templateSaveError, setTemplateSaveError] = useState<string | null>(null);
   const [showBgWmPanel, setShowBgWmPanel] = useState(false);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
@@ -212,7 +215,9 @@ export default function DesignStep() {
   const handleSave = async () => {
     if (!canSaveOverwrite) return;
     const toSave: Template = { ...template, id: template.id, name: template.name, orientation: printSettings.orientation };
-    saveUserTemplate(toSave);
+    if (!saveUserTemplate(toSave)) {
+      setTemplateSaveError('Browser storage is full — the template could not be saved. Try deleting unused templates or workspaces.');
+    }
     await saveTemplateWithPicker(toSave.name, toSave);
   };
 
@@ -221,7 +226,9 @@ export default function DesignStep() {
     const id = `user-${Date.now()}`;
     const toSave: Template = { ...template, id, name, orientation: printSettings.orientation };
     // Always save to localStorage so it appears in TemplatePicker
-    saveUserTemplate(toSave);
+    if (!saveUserTemplate(toSave)) {
+      setTemplateSaveError('Browser storage is full — the template could not be saved to "My templates". Try deleting unused templates or workspaces.');
+    }
     // Update both template id and source so subsequent "Save" overwrites the right key
     dispatch({ type: 'SET_TEMPLATE', payload: toSave });
     dispatch({ type: 'SET_CURRENT_TEMPLATE_SOURCE', payload: { type: 'user', id } });
@@ -489,6 +496,17 @@ export default function DesignStep() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={templateSaveError !== null}
+        autoHideDuration={8000}
+        onClose={() => setTemplateSaveError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" variant="filled" onClose={() => setTemplateSaveError(null)}>
+          {templateSaveError}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

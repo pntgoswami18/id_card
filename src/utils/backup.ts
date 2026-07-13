@@ -1,6 +1,7 @@
 import { getWorkspaceList, getWorkspaceData, saveWorkspaceData, LIST_KEY } from './workspaceStorage';
 import { resolveWorkspaceAssets } from './assetStore';
-import { loadUserTemplates, STORAGE_KEY as USER_TEMPLATES_KEY } from './userTemplates';
+import { loadResolvedUserTemplates, restoreUserTemplates } from './userTemplates';
+import type { UserTemplateEntry } from './userTemplates';
 import { loadPrintPresets, STORAGE_KEY as PRINT_PRESETS_KEY } from './printPresets';
 import type { WorkspaceListState, WorkspaceData } from './workspaceStorage';
 import type { PrintPreset } from '../types';
@@ -38,7 +39,8 @@ export async function createBackup(): Promise<BackupData> {
       workspaceData[w.id] = await resolveWorkspaceAssets(data);
     }
   }
-  const userTemplates = loadUserTemplates();
+  // Resolve asset: refs so template images in the backup JSON are self-contained.
+  const userTemplates = await loadResolvedUserTemplates();
   const printPresets = loadPrintPresets();
 
   return {
@@ -94,7 +96,11 @@ export function restoreFromBackup(backup: BackupData): RestoreResult {
       }
     }
 
-    localStorage.setItem(USER_TEMPLATES_KEY, JSON.stringify(userTemplates));
+    // Route through restoreUserTemplates so large template images are
+    // externalized to the asset store instead of hitting the localStorage quota.
+    if (!restoreUserTemplates(userTemplates as UserTemplateEntry[])) {
+      return { ok: false, error: 'Browser storage is full — user templates could not be fully restored.' };
+    }
     localStorage.setItem(PRINT_PRESETS_KEY, JSON.stringify(printPresets));
 
     return { ok: true };

@@ -1,5 +1,6 @@
 import type { Template } from '../types';
 import type { WorkspaceData } from './workspaceStorage';
+import { resolveTemplateAssets } from './assetStore';
 
 // ---- File System Access API types (not in standard lib.dom) ----
 interface FSWritable {
@@ -275,7 +276,8 @@ function buildTemplateContent(name: string, template: Template): string {
  */
 export async function saveTemplateWithPicker(name: string, template: Template): Promise<boolean> {
   const w = window as WindowWithFSA;
-  const content = buildTemplateContent(name, template);
+  // .idtemplate files must be self-contained: swap any asset: refs back to data URLs.
+  const content = buildTemplateContent(name, await resolveTemplateAssets(template));
   if (!w.showSaveFilePicker) {
     const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
