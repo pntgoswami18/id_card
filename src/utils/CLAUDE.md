@@ -43,7 +43,7 @@ localStorage's ~5MB quota is the reason this layer exists: a template background
 - **Read path**: `getWorkspaceData` still returns raw stored data, which may contain `asset:` refs. **Every consumer that feeds data into app state or a self-contained artifact must `await resolveWorkspaceAssets(data)` first.** Current resolve sites: App.tsx hydration + autosave-to-file, WorkspaceSwitcher (`doSwitch`, sub-workspace creation, delete, save-to-file, both duplicate flows), CombinePdfDialog `generateFromWorkspaces`, backup.ts `createBackup`. In-memory `AppState` and all rendering code only ever see plain data URLs.
 - **Self-contained artifacts**: `.idcard` files and backup JSON must contain real data URLs (portable across machines), so resolve before `writeWorkspaceToHandle`/`buildFileContent`; `restoreFromBackup`/`restoreWorkspaceFile` re-externalize automatically by routing through `saveWorkspaceData`.
 - **Migration-free**: pre-existing stored data with inline data URLs passes through `resolveWorkspaceAssets` untouched and is externalized on its next save.
-- **Missing asset** (e.g. IndexedDB cleared): `resolveWorkspaceAssets` drops the background/watermark to `null` with a console.warn rather than rendering a broken `asset:` string.
+- **Missing asset** (e.g. IndexedDB cleared): `resolveWorkspaceAssets` drops the background/watermark to `null` (and clears a missing card-override photo to `null`), each with a console.warn, rather than rendering a broken `asset:` string.
 - User templates (`id-card-user-templates`) are NOT externalized yet — known follow-up.
 
 ## FSA types — do not add @types/wicg-file-system-access
