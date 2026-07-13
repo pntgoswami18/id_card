@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getMigrationNoticeIfAny, PURGE_LEGACY_KEYS, runMigrationIfNeeded } from './storageMigration';
+import { getMigrationNoticeIfAny, PURGE_LEGACY_KEYS, runMigrationIfNeeded, readLegacyWorkspaceList, readLegacyWorkspaceData } from './storageMigration';
 import { LIST_KEY, DATA_PREFIX } from './workspaceStorage';
 import { STORAGE_KEY as USER_TEMPLATES_KEY } from './userTemplates';
 import { STORAGE_KEY as PRINT_PRESETS_KEY } from './printPresets';
@@ -137,6 +137,30 @@ describe('getMigrationNoticeIfAny', () => {
     const notice = await getMigrationNoticeIfAny();
     expect(notice.checked).toBe(true);
     expect(notice.count).toBe(1);
+  });
+});
+
+describe('legacy read-only fallback (degraded boot path)', () => {
+  it('reads the workspace list and per-workspace data straight from localStorage', () => {
+    localStorage.setItem(LIST_KEY, JSON.stringify({ currentId: 'ws1', workspaces: [{ id: 'ws1', name: 'WS1' }] }));
+    localStorage.setItem(DATA_PREFIX + 'ws1', JSON.stringify({ template: { id: 't1' }, records: [{ a: 1 }] }));
+
+    expect(readLegacyWorkspaceList()).toEqual({ currentId: 'ws1', workspaces: [{ id: 'ws1', name: 'WS1' }] });
+    expect(readLegacyWorkspaceData('ws1')).toEqual({ template: { id: 't1' }, records: [{ a: 1 }] });
+  });
+
+  it('defaults currentId to the first workspace when the stored list omits it', () => {
+    localStorage.setItem(LIST_KEY, JSON.stringify({ currentId: '', workspaces: [{ id: 'ws1', name: 'WS1' }] }));
+    expect(readLegacyWorkspaceList()?.currentId).toBe('ws1');
+  });
+
+  it('returns null for absent or corrupt legacy data instead of throwing', () => {
+    expect(readLegacyWorkspaceList()).toBeNull();
+    expect(readLegacyWorkspaceData('nope')).toBeNull();
+    localStorage.setItem(LIST_KEY, 'not valid json {{{');
+    localStorage.setItem(DATA_PREFIX + 'ws1', '{ bad');
+    expect(readLegacyWorkspaceList()).toBeNull();
+    expect(readLegacyWorkspaceData('ws1')).toBeNull();
   });
 });
 

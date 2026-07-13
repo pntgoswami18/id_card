@@ -19,7 +19,32 @@ import { STORE_NAMES } from './idbSchema';
  *   its IndexedDB copy has been read back and found to match exactly.
  * - Partial-failure tolerant: one corrupt/malformed legacy entry is skipped
  *   and recorded, never aborts migrating the rest.
+ * - Concurrency-safe: if two tabs boot at once right after upgrade, both may
+ *   run this concurrently. That is harmless — every write is an idempotent
+ *   keyed `put`, `PURGE_LEGACY_KEYS` is off, and the idb `meta` record
+ *   short-circuits any later run — so the copies simply race to the same
+ *   result rather than corrupting each other.
+ * - Storage-lock tolerant: every localStorage access goes through the guarded
+ *   ls* helpers below, so a browser that throws on storage access (private
+ *   mode / disabled by policy) degrades to "no legacy data found" instead of
+ *   throwing out of the boot path.
  */
+
+/** Guarded localStorage access — some browsers throw on access when storage is disabled. */
+function lsGet(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function lsSet(key: string, value: string): void {
+  // If this throws (storage locked), the beacon just won't persist; the idb
+  // `meta` record still prevents re-copying, so the migration stays idempotent.
+  try { localStorage.setItem(key, value); } catch { /* storage locked — ignore */ }
+}
+function lsRemove(key: string): void {
+  try { localStorage.removeItem(key); } catch { /* storage locked — ignore */ }
+}
+function lsKeys(): string[] {
+  try { return Object.keys(localStorage); } catch { return []; }
+}
 
 /** Write-once beacon: skip the whole migration subroutine once set. Monotonic — never reset. */
 const BEACON_KEY = 'id_card_idb_migration_v1';
@@ -85,7 +110,7 @@ async function migrateArrayKey<T>(
   corruptSkipped: string[],
   verifyFailed: string[],
 ): Promise<void> {
-  const raw = localStorage.getItem(legacyKey);
+  const raw = lsGet(legacyKey);
   if (raw === null) return;
   const parsedArray = safeParse<unknown[]>(raw);
   if (!Array.isArray(parsedArray)) {
@@ -111,7 +136,7 @@ async function migrateArrayKey<T>(
       allVerified = false;
     }
   }
-  if (allVerified && PURGE_LEGACY_KEYS) localStorage.removeItem(legacyKey);
+  if (allVerified && PURGE_LEGACY_KEYS) lsRemove(legacyKey);
 }
 
 async function runMigration(metaTable: ReturnType<typeof createIdbTable<MigrationStatus>>, resume: MigrationStatus | null): Promise<void> {
@@ -125,7 +150,7 @@ async function runMigration(metaTable: ReturnType<typeof createIdbTable<Migratio
 
   // ---- Workspace list (single record) ----
   const listTable = createIdbTable<WorkspaceListState>(STORE_NAMES.workspaceList);
-  const rawListString = localStorage.getItem(LEGACY_LIST_KEY);
+  const rawListString = lsGet(LEGACY_LIST_KEY);
   if (rawListString !== null) {
     // Parse failures land here as `null`, same as a validly-parsed-but-wrong-shape
     // value — both are corrupt, distinct from the key being absent entirely.
@@ -133,8 +158,11 @@ async function runMigration(metaTable: ReturnType<typeof createIdbTable<Migratio
     if (isValidWorkspaceList(rawList)) {
       const ok = await listTable.put('current', rawList);
       const readBack = ok ? await listTable.get('current') : null;
+      // Verify by value: both sides originate from JSON (parse on the source,
+      // structured-clone on the read-back), and both preserve key insertion
+      // order, so stringify equality is a safe deep-equal here.
       if (ok && JSON.stringify(readBack) === JSON.stringify(rawList)) {
-        if (PURGE_LEGACY_KEYS) localStorage.removeItem(LEGACY_LIST_KEY);
+        if (PURGE_LEGACY_KEYS) lsRemove(LEGACY_LIST_KEY);
       } else {
         verifyFailed.push(LEGACY_LIST_KEY);
       }
@@ -145,11 +173,11 @@ async function runMigration(metaTable: ReturnType<typeof createIdbTable<Migratio
 
   // ---- Workspace data (one row per workspace id) ----
   const dataTable = createIdbTable<WorkspaceData>(STORE_NAMES.workspaceData);
-  const dataKeys = Object.keys(localStorage).filter((k) => k.startsWith(LEGACY_DATA_PREFIX));
+  const dataKeys = lsKeys().filter((k) => k.startsWith(LEGACY_DATA_PREFIX));
   const dataBatch: { key: string; value: WorkspaceData }[] = [];
   for (const key of dataKeys) {
     const id = key.slice(LEGACY_DATA_PREFIX.length);
-    const raw = safeParse<WorkspaceData>(localStorage.getItem(key));
+    const raw = safeParse<WorkspaceData>(lsGet(key));
     if (isValidWorkspaceData(raw)) {
       dataBatch.push({ key: id, value: raw });
     } else {
@@ -162,7 +190,7 @@ async function runMigration(metaTable: ReturnType<typeof createIdbTable<Migratio
       if (!ok) { verifyFailed.push(LEGACY_DATA_PREFIX + id); continue; }
       const readBack = await dataTable.get(id);
       if (JSON.stringify(readBack) === JSON.stringify(source)) {
-        if (PURGE_LEGACY_KEYS) localStorage.removeItem(LEGACY_DATA_PREFIX + id);
+        if (PURGE_LEGACY_KEYS) lsRemove(LEGACY_DATA_PREFIX + id);
       } else {
         verifyFailed.push(LEGACY_DATA_PREFIX + id);
       }
@@ -194,7 +222,7 @@ async function runMigration(metaTable: ReturnType<typeof createIdbTable<Migratio
     startedAt: inProgress.startedAt,
     completedAt: new Date().toISOString(),
   });
-  localStorage.setItem(BEACON_KEY, 'complete');
+  lsSet(BEACON_KEY, 'complete');
 }
 
 /**
@@ -204,7 +232,7 @@ async function runMigration(metaTable: ReturnType<typeof createIdbTable<Migratio
  * storage read (workspaceStorage/userTemplates/printPresets) during boot.
  */
 export async function runMigrationIfNeeded(): Promise<MigrationRunResult> {
-  if (localStorage.getItem(BEACON_KEY) === 'complete') {
+  if (lsGet(BEACON_KEY) === 'complete') {
     return { ran: false, degraded: false };
   }
 
@@ -217,20 +245,20 @@ export async function runMigrationIfNeeded(): Promise<MigrationRunResult> {
   if (existing?.status === 'complete') {
     // Meta says complete but the beacon is missing (e.g. localStorage partially
     // cleared) — trust the IndexedDB record, restore the beacon, skip re-copying.
-    localStorage.setItem(BEACON_KEY, 'complete');
+    lsSet(BEACON_KEY, 'complete');
     return { ran: false, degraded: false };
   }
 
   const hasAnyLegacyData =
-    localStorage.getItem(LEGACY_LIST_KEY) !== null ||
-    Object.keys(localStorage).some((k) => k.startsWith(LEGACY_DATA_PREFIX)) ||
-    localStorage.getItem(LEGACY_USER_TEMPLATES_KEY) !== null ||
-    localStorage.getItem(LEGACY_PRINT_PRESETS_KEY) !== null;
+    lsGet(LEGACY_LIST_KEY) !== null ||
+    lsKeys().some((k) => k.startsWith(LEGACY_DATA_PREFIX)) ||
+    lsGet(LEGACY_USER_TEMPLATES_KEY) !== null ||
+    lsGet(LEGACY_PRINT_PRESETS_KEY) !== null;
 
   if (!hasAnyLegacyData) {
     // Fresh install, or a previous run already purged everything — nothing to copy.
     await metaTable.put(META_STATUS_KEY, { status: 'complete', corruptSkipped: [], verifyFailed: [], completedAt: new Date().toISOString() });
-    localStorage.setItem(BEACON_KEY, 'complete');
+    lsSet(BEACON_KEY, 'complete');
     return { ran: false, degraded: false };
   }
 
@@ -248,7 +276,7 @@ export async function runMigrationIfNeeded(): Promise<MigrationRunResult> {
  * a later boot.
  */
 export async function getMigrationNoticeIfAny(): Promise<{ checked: boolean; count: number }> {
-  if (localStorage.getItem(NOTICE_SHOWN_KEY) === 'shown') {
+  if (lsGet(NOTICE_SHOWN_KEY) === 'shown') {
     return { checked: true, count: 0 };
   }
   if (!(await isIdbAvailable())) {
@@ -256,7 +284,29 @@ export async function getMigrationNoticeIfAny(): Promise<{ checked: boolean; cou
   }
   const metaTable = createIdbTable<MigrationStatus>(STORE_NAMES.meta);
   const status = await metaTable.get(META_STATUS_KEY);
-  localStorage.setItem(NOTICE_SHOWN_KEY, 'shown');
+  lsSet(NOTICE_SHOWN_KEY, 'shown');
   if (!status) return { checked: true, count: 0 };
   return { checked: true, count: status.corruptSkipped.length + status.verifyFailed.length };
+}
+
+/**
+ * Read-only legacy-localStorage fallback for the degraded boot path (IndexedDB
+ * unavailable, so the normal idb-backed reads return nothing). The pre-v2 keys
+ * are still present — never purged during the soak period — so an existing user
+ * keeps read access to their workspaces even when idb can't be opened. Writes
+ * still fail in this mode (surfaced via the storage-full banner); this only
+ * restores the pre-migration read behaviour. Copy-on-write parent template
+ * overlay is intentionally not applied here (a rare, already-degraded path).
+ */
+export function readLegacyWorkspaceList(): WorkspaceListState | null {
+  const parsed = safeParse<WorkspaceListState>(lsGet(LEGACY_LIST_KEY));
+  if (!isValidWorkspaceList(parsed)) return null;
+  if (!parsed.currentId && parsed.workspaces[0]) parsed.currentId = parsed.workspaces[0].id;
+  return parsed;
+}
+
+/** Read-only legacy-localStorage read of a single workspace's data. See readLegacyWorkspaceList. */
+export function readLegacyWorkspaceData(id: string): WorkspaceData | null {
+  const parsed = safeParse<WorkspaceData>(lsGet(LEGACY_DATA_PREFIX + id));
+  return isValidWorkspaceData(parsed) ? parsed : null;
 }

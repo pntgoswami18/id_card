@@ -40,7 +40,7 @@ import {
 } from './utils/workspaceStorage';
 import type { WorkspaceData, WorkspaceMeta } from './utils/workspaceStorage';
 import { resolveWorkspaceAssets } from './utils/assetStore';
-import { runMigrationIfNeeded, getMigrationNoticeIfAny } from './utils/storageMigration';
+import { runMigrationIfNeeded, getMigrationNoticeIfAny, readLegacyWorkspaceList, readLegacyWorkspaceData } from './utils/storageMigration';
 import {
   writeWorkspaceToHandle,
   getAutoSavePref,
@@ -69,6 +69,9 @@ function AppContent() {
   // Resolved once the boot effect below has loaded the workspace list from IndexedDB;
   // starts false so the app doesn't flash the setup modal before that check completes.
   const [needsSetup, setNeedsSetup] = useState(false);
+  // Gates the whole UI until the boot effect below has resolved, so neither the
+  // main app nor the setup modal flashes before the workspace list is known.
+  const [bootResolved, setBootResolved] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   // Bumped once IndexedDB-persisted file handles have been rehydrated into fileHandleRef,
   // so WorkspaceSwitcher's handle-sync effect (which reads a ref, not state) knows to re-check.
@@ -89,34 +92,54 @@ function AppContent() {
     })();
 
     void (async () => {
-      // The localStorage -> IndexedDB storage migration must complete before the
-      // workspace list/data reads below, which now read from IndexedDB exclusively —
-      // otherwise an existing user's not-yet-migrated data would look absent and
-      // trigger the first-launch setup modal. See src/utils/storageMigration.ts.
-      const migration = await runMigrationIfNeeded();
-      if (migration.degraded) {
-        setStorageError("This browser's storage upgrade could not run — your data is still safe, but you may hit the same size limits as before.");
-        return;
-      }
-      const notice = await getMigrationNoticeIfAny();
-      if (notice.checked && notice.count > 0) {
-        setStorageError(`${notice.count} item(s) from your previous browser storage could not be upgraded and were left in place.`);
-      }
+      try {
+        // The localStorage -> IndexedDB storage migration must complete before the
+        // workspace list/data reads below, which now read from IndexedDB exclusively —
+        // otherwise an existing user's not-yet-migrated data would look absent and
+        // trigger the first-launch setup modal. See src/utils/storageMigration.ts.
+        const migration = await runMigrationIfNeeded();
+        if (migration.degraded) {
+          setStorageError("This browser's storage upgrade could not run — your data is still safe, but you may hit the same size limits as before.");
+          // Read-only fallback: the legacy localStorage keys are still present, so an
+          // existing user keeps access to their workspaces even though writes (idb) fail.
+          const legacyList = readLegacyWorkspaceList();
+          if (!legacyList || legacyList.workspaces.length === 0) {
+            setNeedsSetup(true);
+          } else {
+            dispatch({ type: 'SET_WORKSPACE_LIST', payload: legacyList.workspaces });
+            dispatch({ type: 'SET_CURRENT_WORKSPACE', payload: legacyList.currentId });
+            const legacyData = readLegacyWorkspaceData(legacyList.currentId);
+            if (legacyData) {
+              skipAutoSaveRef.current = true;
+              dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: { ...legacyData, logo: legacyData.logo } });
+            }
+          }
+          return;
+        }
+        const notice = await getMigrationNoticeIfAny();
+        if (notice.checked && notice.count > 0) {
+          setStorageError(`${notice.count} item(s) from your previous browser storage could not be upgraded and were left in place.`);
+        }
 
-      const list = await getWorkspaceList();
-      if (list.workspaces.length === 0) {
-        setNeedsSetup(true);
-      }
-      dispatch({ type: 'SET_WORKSPACE_LIST', payload: list.workspaces });
-      dispatch({ type: 'SET_CURRENT_WORKSPACE', payload: list.currentId });
-      const data = await getEffectiveWorkspaceData(list.currentId);
-      if (data) {
-        const resolved = await resolveWorkspaceAssets(data);
-        // Re-arm the skip flag: the SET_WORKSPACE_LIST/SET_CURRENT_WORKSPACE render
-        // above already consumed the initial one, and this LOAD dispatch lands in a
-        // later render that must not trigger an autosave of freshly-loaded data.
-        skipAutoSaveRef.current = true;
-        dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: { ...resolved, logo: resolved.logo } });
+        const list = await getWorkspaceList();
+        if (list.workspaces.length === 0) {
+          setNeedsSetup(true);
+        }
+        dispatch({ type: 'SET_WORKSPACE_LIST', payload: list.workspaces });
+        dispatch({ type: 'SET_CURRENT_WORKSPACE', payload: list.currentId });
+        const data = await getEffectiveWorkspaceData(list.currentId);
+        if (data) {
+          const resolved = await resolveWorkspaceAssets(data);
+          // Re-arm the skip flag: the SET_WORKSPACE_LIST/SET_CURRENT_WORKSPACE render
+          // above already consumed the initial one, and this LOAD dispatch lands in a
+          // later render that must not trigger an autosave of freshly-loaded data.
+          skipAutoSaveRef.current = true;
+          dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: { ...resolved, logo: resolved.logo } });
+        }
+      } finally {
+        // Always lift the boot gate, even if a read unexpectedly threw, so the UI
+        // never gets stuck on the spinner.
+        setBootResolved(true);
       }
     })();
   }, [dispatch]);
@@ -236,6 +259,14 @@ function AppContent() {
   const handleSetWorkspaceLogo = useCallback((logo: string | undefined) => {
     dispatch({ type: 'SET_WORKSPACE_LOGO', payload: logo });
   }, [dispatch]);
+
+  if (!bootResolved) {
+    return (
+      <Box sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box
