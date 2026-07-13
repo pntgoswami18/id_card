@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileOpenIcon from '@mui/icons-material/FileOpen';
 import { loadUserTemplates, deleteUserTemplate, saveUserTemplate } from '../utils/userTemplates';
+import type { UserTemplateEntry } from '../utils/userTemplates';
 import { resolveTemplateAssets } from '../utils/assetStore';
 import {
   readTemplateFile,
@@ -27,12 +28,12 @@ interface TemplatePickerProps {
 }
 
 export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete }: TemplatePickerProps) {
-  const [userTemplates, setUserTemplates] = useState(() => loadUserTemplates());
+  const [userTemplates, setUserTemplates] = useState<UserTemplateEntry[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   // Refresh template list every time the dialog opens
   useEffect(() => {
-    if (open) setUserTemplates(loadUserTemplates());
+    if (open) void loadUserTemplates().then(setUserTemplates);
   }, [open]);
 
   const handleSelectUser = async (meta: UserTemplateMeta, template: Template) => {
@@ -46,23 +47,23 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
     setDeleteConfirm({ id: meta.id, name: meta.name });
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
-    deleteUserTemplate(deleteConfirm.id);
+    await deleteUserTemplate(deleteConfirm.id);
     setUserTemplates((prev) => prev.filter((t) => t.meta.id !== deleteConfirm.id));
     onAfterDelete?.(deleteConfirm.id);
     setDeleteConfirm(null);
   };
 
-  const importAndSelect = (t: Template) => {
+  const importAndSelect = async (t: Template) => {
     // Assign a fresh id so the import never silently overwrites an existing user template
     const imported: Template = { ...t, id: `user-${Date.now()}` };
-    if (!saveUserTemplate(imported)) {
+    if (!(await saveUserTemplate(imported))) {
       setImportError(
         'Browser storage is full — the template could not be saved to "My templates". It will still be applied to this workspace.',
       );
     }
-    setUserTemplates(loadUserTemplates());
+    setUserTemplates(await loadUserTemplates());
     onSelect(imported, { type: 'user', id: imported.id });
     onClose();
   };
@@ -76,7 +77,7 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
       setImportError('Invalid template file. Please choose a .idtemplate file.');
       return;
     }
-    importAndSelect(tf.template);
+    await importAndSelect(tf.template);
   };
 
   return (

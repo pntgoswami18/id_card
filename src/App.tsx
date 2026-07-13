@@ -32,7 +32,6 @@ class StepErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
 import theme from './theme';
 import { AppStateProvider, useAppState, useAppDispatch } from './store/AppStateContext';
 import {
-  LIST_KEY,
   getWorkspaceList,
   getWorkspaceData,
   getEffectiveWorkspaceData,
@@ -41,6 +40,7 @@ import {
 } from './utils/workspaceStorage';
 import type { WorkspaceData, WorkspaceMeta } from './utils/workspaceStorage';
 import { resolveWorkspaceAssets } from './utils/assetStore';
+import { runMigrationIfNeeded, getMigrationNoticeIfAny } from './utils/storageMigration';
 import {
   writeWorkspaceToHandle,
   getAutoSavePref,
@@ -66,7 +66,9 @@ function AppContent() {
   const currentWorkspaceIdRef = useRef(currentWorkspaceId);
   const currentWorkspaceDataRef = useRef<WorkspaceData | null>(null);
   const [autoSaveToFile, setAutoSaveToFile] = useState(() => getAutoSavePref());
-  const [needsSetup, setNeedsSetup] = useState(() => localStorage.getItem(LIST_KEY) === null);
+  // Resolved once the boot effect below has loaded the workspace list from IndexedDB;
+  // starts false so the app doesn't flash the setup modal before that check completes.
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   // Bumped once IndexedDB-persisted file handles have been rehydrated into fileHandleRef,
   // so WorkspaceSwitcher's handle-sync effect (which reads a ref, not state) knows to re-check.
@@ -75,19 +77,6 @@ function AppContent() {
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
-    const list = getWorkspaceList();
-    dispatch({ type: 'SET_WORKSPACE_LIST', payload: list.workspaces });
-    dispatch({ type: 'SET_CURRENT_WORKSPACE', payload: list.currentId });
-    const data = getEffectiveWorkspaceData(list.currentId);
-    if (data) {
-      void resolveWorkspaceAssets(data).then((resolved) => {
-        // Re-arm the skip flag: the SET_WORKSPACE_LIST/SET_CURRENT_WORKSPACE render
-        // above already consumed the initial one, and this LOAD dispatch lands in a
-        // later render that must not trigger an autosave of freshly-loaded data.
-        skipAutoSaveRef.current = true;
-        dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: { ...resolved, logo: resolved.logo } });
-      });
-    }
 
     // Best-effort: repopulate the in-memory handle map from IndexedDB so links established
     // in a previous session (before this page load) can silently resume autosave.
@@ -97,6 +86,38 @@ function AppContent() {
         fileHandleRef.current.set(rootId, handle);
       }
       setHandleRehydrationVersion((v) => v + 1);
+    })();
+
+    void (async () => {
+      // The localStorage -> IndexedDB storage migration must complete before the
+      // workspace list/data reads below, which now read from IndexedDB exclusively —
+      // otherwise an existing user's not-yet-migrated data would look absent and
+      // trigger the first-launch setup modal. See src/utils/storageMigration.ts.
+      const migration = await runMigrationIfNeeded();
+      if (migration.degraded) {
+        setStorageError("This browser's storage upgrade could not run — your data is still safe, but you may hit the same size limits as before.");
+        return;
+      }
+      const notice = await getMigrationNoticeIfAny();
+      if (notice.checked && notice.count > 0) {
+        setStorageError(`${notice.count} item(s) from your previous browser storage could not be upgraded and were left in place.`);
+      }
+
+      const list = await getWorkspaceList();
+      if (list.workspaces.length === 0) {
+        setNeedsSetup(true);
+      }
+      dispatch({ type: 'SET_WORKSPACE_LIST', payload: list.workspaces });
+      dispatch({ type: 'SET_CURRENT_WORKSPACE', payload: list.currentId });
+      const data = await getEffectiveWorkspaceData(list.currentId);
+      if (data) {
+        const resolved = await resolveWorkspaceAssets(data);
+        // Re-arm the skip flag: the SET_WORKSPACE_LIST/SET_CURRENT_WORKSPACE render
+        // above already consumed the initial one, and this LOAD dispatch lands in a
+        // later render that must not trigger an autosave of freshly-loaded data.
+        skipAutoSaveRef.current = true;
+        dispatch({ type: 'LOAD_WORKSPACE_STATE', payload: { ...resolved, logo: resolved.logo } });
+      }
     })();
   }, [dispatch]);
 
@@ -121,32 +142,32 @@ function AppContent() {
       templateLinkedToParent,
     };
     const t = setTimeout(() => {
-      if (!saveWorkspaceData(currentWorkspaceId, data)) {
-        setStorageError('Browser storage is full — this workspace could not be saved. Free up space by deleting unused workspaces or removing large images.');
-      }
-      if (autoSaveToFile) {
-        // Always autosave from the root so children are included in the file.
-        const rootId = workspaceList.find((w) => w.id === currentWorkspaceId)?.parentId ?? currentWorkspaceId;
-        const handle = fileHandleRef.current.get(rootId);
-        if (handle) {
-          const rootMeta = workspaceList.find((w) => w.id === rootId);
-          const rootName = rootMeta?.name ?? currentWorkspaceName;
-          const childMetas = workspaceList.filter((w) => w.parentId === rootId);
-          // Stored siblings hold asset: refs — resolve them so the .idcard file stays self-contained.
-          void (async () => {
+      void (async () => {
+        if (!(await saveWorkspaceData(currentWorkspaceId, data))) {
+          setStorageError('Browser storage is full — this workspace could not be saved. Free up space by deleting unused workspaces or removing large images.');
+        }
+        if (autoSaveToFile) {
+          // Always autosave from the root so children are included in the file.
+          const rootId = workspaceList.find((w) => w.id === currentWorkspaceId)?.parentId ?? currentWorkspaceId;
+          const handle = fileHandleRef.current.get(rootId);
+          if (handle) {
+            const rootMeta = workspaceList.find((w) => w.id === rootId);
+            const rootName = rootMeta?.name ?? currentWorkspaceName;
+            const childMetas = workspaceList.filter((w) => w.parentId === rootId);
+            // Stored siblings hold asset: refs — resolve them so the .idcard file stays self-contained.
             const rootData = await resolveWorkspaceAssets(
-              rootId === currentWorkspaceId ? data : (getWorkspaceData(rootId) ?? data),
+              rootId === currentWorkspaceId ? data : ((await getWorkspaceData(rootId)) ?? data),
             );
             const children = await Promise.all(childMetas.map(async (meta) => ({
               meta: { name: meta.name, ...(meta.logo ? { logo: meta.logo } : {}) },
               data: await resolveWorkspaceAssets(
-                (meta.id === currentWorkspaceId ? data : getWorkspaceData(meta.id)) ?? getDefaultWorkspaceData(),
+                (meta.id === currentWorkspaceId ? data : await getWorkspaceData(meta.id)) ?? getDefaultWorkspaceData(),
               ),
             })));
             void writeWorkspaceToHandle(handle, rootName, rootData, children);
-          })();
+          }
         }
-      }
+      })();
     }, 400);
     return () => clearTimeout(t);
   }, [
@@ -189,12 +210,12 @@ function AppContent() {
     <PrintStep key="print" />,
   ], []);
 
-  const handleSaveCurrent = useCallback((overrides?: Partial<WorkspaceData>) => {
+  const handleSaveCurrent = useCallback(async (overrides?: Partial<WorkspaceData>) => {
     const id = currentWorkspaceIdRef.current;
     if (!id) return;
     const base = currentWorkspaceDataRef.current!;
     const toSave = overrides ? { ...base, ...overrides } : base;
-    if (!saveWorkspaceData(id, toSave)) {
+    if (!(await saveWorkspaceData(id, toSave))) {
       setStorageError('Browser storage is full — this workspace could not be saved. Free up space by deleting unused workspaces or removing large images.');
     }
   }, []);

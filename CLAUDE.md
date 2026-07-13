@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Stack
 
-React 19 + TypeScript + Vite 7 + MUI v7. No backend — all data stored in `localStorage`. PapaParse for CSV.
+React 19 + TypeScript + Vite 7 + MUI v7. No backend — structural app data (workspaces, user templates, print presets) lives in IndexedDB (`id_card_store`); large images live in a separate IndexedDB database (`id_card_assets`); a couple of small UI preferences remain in plain localStorage. See `src/utils/CLAUDE.md` § "Persisted storage" for the full picture. PapaParse for CSV.
 
 ## Commands
 
@@ -13,17 +13,18 @@ npm run dev      # dev server on http://localhost:5173 (also on LAN via 0.0.0.0)
 npm run build    # tsc -b && vite build
 npm run lint     # ESLint
 npm run preview  # preview production build
+npm run test     # vitest run (unit tests for the IndexedDB storage layer)
 ```
 
 **`launch-app.bat`** (Windows) — one-click launcher that checks for Node.js, npm, and git (errors with install instructions if missing), pulls latest from `origin/main`, runs `npm install`, then starts the dev server and opens the app in the default browser automatically.
 
-No test suite exists yet.
+Test coverage is currently limited to the storage layer (`src/utils/idbStore.test.ts`, `src/utils/storageMigration.test.ts`, run via Vitest + fake-indexeddb) — no component/UI tests exist yet.
 
 ## Architecture
 
 - **State**: React Context + useReducer in `src/store/appState.ts` + `src/store/AppStateContext.tsx`. All shared state lives in `AppState`.
 - **Steps**: `App.tsx` renders a `StepErrorBoundary` keyed by `activeStep`, which causes full remount when switching steps. Any local state that must survive step navigation must be lifted into `AppState`.
-- **Workspaces**: `src/utils/workspaceStorage.ts` handles localStorage CRUD. `src/utils/workspaceFile.ts` handles File System Access API for `.idcard` save/open.
+- **Workspaces**: `src/utils/workspaceStorage.ts` handles async IndexedDB CRUD (every function returns a `Promise`) for the workspace list and per-workspace data. `src/utils/workspaceFile.ts` handles File System Access API for `.idcard` save/open. A one-time migration (`src/utils/storageMigration.ts`) copies pre-upgrade localStorage data into IndexedDB on first boot after upgrade — see `src/utils/CLAUDE.md`.
 
 ## Key gotchas
 
@@ -37,9 +38,11 @@ No test suite exists yet.
 
 **FSA only works in Chrome/Edge.** `hasSaveFilePicker()` / `hasOpenFilePicker()` guard all FSA calls. Always provide the fallback path (hidden `<input type="file">` for open, `downloadWorkspaceFile` for save).
 
-**CSV data is persisted to localStorage** (`csvData` in `AppState`) so column-mapping survives a page reload or workspace switch. It is stripped from `.idcard` file exports (`buildFileContent` destructures it out) and from workspace duplicates (`duplicateWorkspace` strips it). Opening a `.idcard` file clears csvData because it is absent from the file payload.
+**CSV data is persisted as part of `WorkspaceData`** (`csvData` in `AppState`, written to IndexedDB via `saveWorkspaceData`) so column-mapping survives a page reload or workspace switch. It is stripped from `.idcard` file exports (`buildFileContent` destructures it out) and from workspace duplicates (`duplicateWorkspace` strips it). Opening a `.idcard` file clears csvData because it is absent from the file payload.
 
-**Large images are stored in IndexedDB, not localStorage.** `saveWorkspaceData` swaps data URLs > 8KB (template background/watermark, card photo overrides) for `asset:<hash>` refs backed by the `id_card_assets` IndexedDB store, and returns `false` on quota failure. Stored data from `getWorkspaceData` may therefore contain refs — always `await resolveWorkspaceAssets(data)` (from `src/utils/assetStore.ts`) before dispatching it into app state or writing a self-contained file (.idcard / backup). See `src/utils/CLAUDE.md` § "Asset store".
+**Large images are stored in a separate IndexedDB database, not inline in workspace data.** `saveWorkspaceData` swaps data URLs > 8KB (template background/watermark, card photo overrides) for `asset:<hash>` refs backed by the `id_card_assets` IndexedDB database, and returns `false` on failure. Stored data from `getWorkspaceData` may therefore contain refs — always `await resolveWorkspaceAssets(data)` (from `src/utils/assetStore.ts`) before dispatching it into app state or writing a self-contained file (.idcard / backup). See `src/utils/CLAUDE.md` § "Asset store".
+
+**All storage reads/writes are async.** `workspaceStorage.ts`, `userTemplates.ts`, and `printPresets.ts` are IndexedDB-backed (`id_card_store` database) and every exported function returns a `Promise` — there is no synchronous fallback. A one-time migration (`storageMigration.ts`) must complete before the first read; `App.tsx`'s boot effect awaits it before reading the workspace list. See `src/utils/CLAUDE.md` § "Persisted storage".
 
 ## Code style
 

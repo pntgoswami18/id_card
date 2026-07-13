@@ -1,34 +1,27 @@
 import type { PrintPreset } from '../types';
+import { createIdbTable } from './idbStore';
+import { STORE_NAMES } from './idbSchema';
 
+/** Legacy localStorage key — kept exported only for storageMigration.ts to read from. */
 export const STORAGE_KEY = 'id-card-print-presets';
 
-export function loadPrintPresets(): PrintPreset[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as PrintPreset[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+const table = createIdbTable<PrintPreset>(STORE_NAMES.printPresets);
+
+export async function loadPrintPresets(): Promise<PrintPreset[]> {
+  return table.getAll();
 }
 
-export function savePrintPreset(preset: PrintPreset): void {
-  const list = loadPrintPresets();
-  const existing = list.findIndex((p) => p.id === preset.id);
-  const next = existing >= 0 ? list.map((p, i) => (i === existing ? preset : p)) : [...list, preset];
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    console.warn('Storage quota exceeded: could not save print preset.');
-  }
+export async function savePrintPreset(preset: PrintPreset): Promise<boolean> {
+  return table.put(preset.id, preset);
 }
 
-export function deletePrintPreset(id: string): void {
-  const list = loadPrintPresets().filter((p) => p.id !== id);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch {
-    console.warn('Storage quota exceeded: could not delete print preset.');
-  }
+export async function deletePrintPreset(id: string): Promise<boolean> {
+  return table.delete(id);
+}
+
+/** Replaces the whole stored list (backup restore). Returns false on failure. */
+export async function replacePrintPresets(presets: PrintPreset[]): Promise<boolean> {
+  const cleared = await table.clear();
+  if (!cleared) return false;
+  return table.putMany(presets.map((p) => ({ key: p.id, value: p })));
 }
