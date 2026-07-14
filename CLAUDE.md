@@ -13,12 +13,12 @@ npm run dev      # dev server on http://localhost:5173 (also on LAN via 0.0.0.0)
 npm run build    # tsc -b && vite build
 npm run lint     # ESLint
 npm run preview  # preview production build
-npm run test     # vitest run (unit tests for the IndexedDB storage layer)
+npm run test     # vitest run (storage layer, appState reducer, and pure-logic utils)
 ```
 
 **`launch-app.bat`** (Windows) — one-click launcher that checks for Node.js, npm, and git (errors with install instructions if missing), pulls latest from `origin/main`, runs `npm install`, then starts the dev server and opens the app in the default browser automatically.
 
-Test coverage is currently limited to the storage layer (`src/utils/idbStore.test.ts`, `src/utils/storageMigration.test.ts`, run via Vitest + fake-indexeddb) — no component/UI tests exist yet.
+Test coverage spans the IndexedDB storage layer (`src/utils/*.test.ts`, run via Vitest + fake-indexeddb), the `appState` reducer (`src/store/appState.test.ts`), and pure-logic utils (`csv.ts`, `id.ts`, `file.ts`, `saveFile.ts`, `aggregatePdf.ts`, `importImages.ts`, and `PrintSettings.tsx`'s `computeLayout`/`computeEffectivePaperDims`). `@testing-library/react`/`jest-dom`/`user-event` are installed and `vitest.config.ts` runs `*.test.tsx` (via `@vitejs/plugin-react`, with matchers loaded from `src/setupTests.ts`), but no actual component tests exist yet — that's still open work. Note: `vitest.config.ts`'s `setupFiles` uses an explicit relative path for `fake-indexeddb/auto` rather than the bare specifier — the bare specifier can resolve to the wrong project's `node_modules` in a nested git-worktree checkout.
 
 ## Architecture
 
