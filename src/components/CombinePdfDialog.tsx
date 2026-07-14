@@ -45,12 +45,14 @@ const PAPER_SIZES = [
   { id: 'a3',     label: 'A3 (297 × 420 mm)',     width: 297, height: 420 },
   { id: 'letter', label: 'Letter (216 × 279 mm)', width: 216, height: 279 },
   { id: 'legal',  label: 'Legal (216 × 356 mm)',  width: 216, height: 356 },
+  { id: 'custom', label: 'Custom',                width: 0,   height: 0   },
 ] as const;
 
 function detectPaperId(w: number, h: number): string {
   const lo = Math.min(w, h);
   const hi = Math.max(w, h);
-  return PAPER_SIZES.find((p) => p.width === lo && p.height === hi)?.id ?? 'a4';
+  const match = PAPER_SIZES.find((p) => p.id !== 'custom' && p.width === lo && p.height === hi);
+  return match ? match.id : 'custom';
 }
 
 export default function CombinePdfDialog({ open, onClose, defaultPaper }: CombinePdfDialogProps) {
@@ -60,6 +62,8 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
   const [paperId, setPaperId] = useState(() =>
     detectPaperId(defaultPaper.paperWidthMm, defaultPaper.paperHeightMm),
   );
+  const [customWidth, setCustomWidth] = useState(defaultPaper.paperWidthMm);
+  const [customHeight, setCustomHeight] = useState(defaultPaper.paperHeightMm);
   const [margin, setMargin] = useState(defaultPaper.pageMarginMm);
   const [gap, setGap] = useState(defaultPaper.cardGapMm);
 
@@ -91,11 +95,22 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
     setError(null);
     setProgress(null);
     setPaperId(detectPaperId(defaultPaper.paperWidthMm, defaultPaper.paperHeightMm));
+    setCustomWidth(defaultPaper.paperWidthMm);
+    setCustomHeight(defaultPaper.paperHeightMm);
     setMargin(defaultPaper.pageMarginMm);
     setGap(defaultPaper.cardGapMm);
   }, [open, defaultPaper]);
 
   const paperConfig = (): PaperConfig => {
+    if (paperId === 'custom') {
+      return {
+        paperWidthMm: customWidth,
+        paperHeightMm: customHeight,
+        paperOrientation: 'auto',
+        pageMarginMm: margin,
+        cardGapMm: gap,
+      };
+    }
     const p = PAPER_SIZES.find((x) => x.id === paperId) ?? PAPER_SIZES[0];
     return {
       paperWidthMm: p.width,
@@ -202,8 +217,10 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
   };
 
   const totalImages = importedSized.length + importedUnsized.length;
+  const hasValidPaperSize = paperId !== 'custom' || (customWidth > 0 && customHeight > 0);
   const canGenerate =
     !busy &&
+    hasValidPaperSize &&
     (tab === 'workspaces' ? selectedIds.size > 0 : totalImages > 0);
 
   return (
@@ -305,6 +322,30 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
               ))}
             </Select>
           </FormControl>
+          {paperId === 'custom' && (
+            <>
+              <TextField
+                label="Paper width (mm)"
+                type="number"
+                size="small"
+                value={customWidth}
+                onChange={(e) => setCustomWidth(Number(e.target.value))}
+                disabled={busy}
+                error={!(customWidth > 0)}
+                sx={{ width: 140 }}
+              />
+              <TextField
+                label="Paper height (mm)"
+                type="number"
+                size="small"
+                value={customHeight}
+                onChange={(e) => setCustomHeight(Number(e.target.value))}
+                disabled={busy}
+                error={!(customHeight > 0)}
+                sx={{ width: 140 }}
+              />
+            </>
+          )}
           <TextField
             label="Margin (mm)"
             type="number"
