@@ -13,12 +13,12 @@ npm run dev      # dev server on http://localhost:5173 (also on LAN via 0.0.0.0)
 npm run build    # tsc -b && vite build
 npm run lint     # ESLint
 npm run preview  # preview production build
-npm run test     # vitest run (storage layer, appState reducer, and pure-logic utils)
+npm run test     # vitest run (storage layer, appState reducer, pure-logic utils, and a growing set of component tests)
 ```
 
 **`launch-app.bat`** (Windows) — one-click launcher that checks for Node.js, npm, and git (errors with install instructions if missing), pulls latest from `origin/main`, runs `npm install`, then starts the dev server and opens the app in the default browser automatically.
 
-Test coverage spans the IndexedDB storage layer (`src/utils/*.test.ts`, run via Vitest + fake-indexeddb), the `appState` reducer (`src/store/appState.test.ts`), and pure-logic utils (`csv.ts`, `id.ts`, `file.ts`, `saveFile.ts`, `aggregatePdf.ts`, `importImages.ts`, and `PrintSettings.tsx`'s `computeLayout`/`computeEffectivePaperDims`). `@testing-library/react`/`jest-dom`/`user-event` are installed and `vitest.config.ts` runs `*.test.tsx` (via `@vitejs/plugin-react`, with matchers loaded from `src/setupTests.ts`), but no actual component tests exist yet — that's still open work. Note: `vitest.config.ts`'s `setupFiles` uses an explicit relative path for `fake-indexeddb/auto` rather than the bare specifier — the bare specifier can resolve to the wrong project's `node_modules` in a nested git-worktree checkout.
+Test coverage spans the IndexedDB/FSA storage layer (`src/utils/*.test.ts`, run via Vitest + fake-indexeddb — includes `assetStore`, `fileHandleStore`, `workspaceFile` with mocked File System Access API, and `exportImages` with mocked `html2canvas`), the `appState` reducer (`src/store/appState.test.ts`), pure-logic utils (`csv.ts`, `id.ts`, `file.ts`, `saveFile.ts`, `aggregatePdf.ts`, `importImages.ts`, and `PrintSettings.tsx`'s `computeLayout`/`computeEffectivePaperDims`), and a first component test (`WebcamCapture.test.tsx`, via `@testing-library/react`). `src/setupTests.ts` polyfills several jsdom gaps every test that touches files/canvas/fonts will otherwise hit — see its comments (`Blob.text`/`arrayBuffer`, `URL.createObjectURL`/`revokeObjectURL`, `document.fonts`, `ResizeObserver`). Note: `vitest.config.ts`'s `setupFiles` uses an explicit relative path for `fake-indexeddb/auto` rather than the bare specifier — the bare specifier can resolve to the wrong project's `node_modules` in a nested git-worktree checkout.
 
 ## Architecture
 
