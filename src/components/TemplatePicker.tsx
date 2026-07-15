@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -18,6 +19,7 @@ import { resolveTemplateAssets } from '../utils/assetStore';
 import {
   readTemplateFile,
 } from '../utils/workspaceFile';
+import { touchTarget44 } from '../utils/a11y';
 import type { Template, UserTemplateMeta } from '../types';
 
 interface TemplatePickerProps {
@@ -29,11 +31,21 @@ interface TemplatePickerProps {
 
 export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete }: TemplatePickerProps) {
   const [userTemplates, setUserTemplates] = useState<UserTemplateEntry[]>([]);
+  // Gates the empty-state message so it doesn't flash before the async IndexedDB
+  // read below resolves on open.
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
-  // Refresh template list every time the dialog opens
+  // Refresh template list every time the dialog opens. templatesLoaded is only
+  // ever flipped true (never reset) — after the first load, later reopens keep
+  // showing the previous list until the refreshed one lands, so there's no
+  // second flash of the "no templates yet" empty state to guard against.
   useEffect(() => {
-    if (open) void loadUserTemplates().then(setUserTemplates);
+    if (!open) return;
+    void loadUserTemplates().then((templates) => {
+      setUserTemplates(templates);
+      setTemplatesLoaded(true);
+    });
   }, [open]);
 
   const handleSelectUser = async (meta: UserTemplateMeta, template: Template) => {
@@ -88,7 +100,7 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
           Templates are available in all workspaces.
         </Typography>
 
-        {userTemplates.length > 0 && (
+        {userTemplates.length > 0 ? (
           <>
             <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
               My templates
@@ -105,6 +117,7 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
                       onClick={(e) => handleDeleteClick(e, meta)}
                       size="small"
                       color="error"
+                      sx={touchTarget44}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -120,6 +133,28 @@ export default function TemplatePicker({ open, onClose, onSelect, onAfterDelete 
               ))}
             </List>
           </>
+        ) : (
+          templatesLoaded && (
+            <Box
+              sx={{
+                mt: 1,
+                py: 2.5,
+                px: 2,
+                border: '1px dashed',
+                borderColor: 'divider',
+                borderRadius: 2,
+                textAlign: 'center',
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                No templates yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Design a card, then use <strong>Save Template Options</strong> in the Design
+                step to add it here — or import a <code>.idtemplate</code> file below.
+              </Typography>
+            </Box>
+          )
         )}
 
       </DialogContent>

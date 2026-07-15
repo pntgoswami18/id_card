@@ -19,6 +19,7 @@ import CardEditDialog from './CardEditDialog';
 import WebcamCapture from './WebcamCapture';
 import ImageCropDialog from './ImageCropDialog';
 import BulkPhotoModal from './BulkPhotoModal';
+import { touchTarget44 } from '../utils/a11y';
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96, 192];
 
@@ -221,6 +222,7 @@ export default function PreviewStep() {
                         size="small"
                         edge="end"
                         aria-label="Clear search"
+                        sx={touchTarget44}
                         onClick={() => {
                           setSearchQuery('');
                           setTimeout(() => searchInputRef.current?.focus(), 0);

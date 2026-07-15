@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Checkbox from '@mui/material/Checkbox';
 import CardCanvas from './CardCanvas';
+import { touchTarget44 } from '../utils/a11y';
 import type { CardRecord, Template } from '../types';
 
 const CARD_PREVIEW_WIDTH_PX = 200;
@@ -70,6 +71,7 @@ export default function PreviewGrid({
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
             <Checkbox
               size="small"
+              sx={touchTarget44}
               checked={selectedSet.has(globalIndex)}
               onChange={(e) => {
                 e.stopPropagation();
