@@ -260,6 +260,9 @@ export default function CardEditDialog({
                     value={fontSizeText[binding] ?? ''}
                     onChange={(e) => handleFontSizeTextChange(binding, e.target.value)}
                     onBlur={() => handleFontSizeBlur(binding)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleFontSizeBlur(binding);
+                    }}
                     placeholder="Auto"
                     type="number"
                     inputProps={{ min: 4, max: 144, step: 1, onWheel: (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur() }}
