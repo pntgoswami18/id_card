@@ -29,6 +29,7 @@ import BackgroundWatermarkPanel from './BackgroundWatermarkPanel';
 import { ElementPropertiesPanel } from './DesignEditor';
 import { saveUserTemplate } from '../utils/userTemplates';
 import { saveTemplateWithPicker, hasSaveFilePicker } from '../utils/workspaceFile';
+import { touchTarget44 } from '../utils/a11y';
 import type { Template, TemplateElement } from '../types';
 import { generateId } from '../utils/id';
 
@@ -288,7 +289,7 @@ export default function DesignStep() {
           </Tooltip>
         )}
         <Tooltip title={getStartedText} placement="bottom" enterDelay={300}>
-          <IconButton size="small" color="info" aria-label="Get started help">
+          <IconButton size="small" color="info" aria-label="Get started help" sx={touchTarget44}>
             <InfoOutlined fontSize="small" />
           </IconButton>
         </Tooltip>

@@ -21,6 +21,7 @@ import Alert from '@mui/material/Alert';
 import LinearProgress from '@mui/material/LinearProgress';
 import { getWorkspaceList, getEffectiveWorkspaceData } from '../utils/workspaceStorage';
 import { resolveWorkspaceAssets } from '../utils/assetStore';
+import { touchTarget44 } from '../utils/a11y';
 import { renderCardsToImages } from '../utils/exportImages';
 import { importCardsFromFiles } from '../utils/importImages';
 import { aggregateCardsToPdf, type CardImage } from '../utils/aggregatePdf';
@@ -232,7 +233,14 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
           don't waste paper. Cards of different sizes are grouped automatically.
         </Typography>
 
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{ mb: 2 }}
+        >
           <Tab value="workspaces" label="From workspaces" />
           <Tab value="images" label="From exported images" />
         </Tabs>
@@ -248,6 +256,7 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
                     <FormControlLabel
                       control={
                         <Checkbox
+                          sx={touchTarget44}
                           checked={selectedIds.has(w.id)}
                           onChange={() => toggleWorkspace(w.id)}
                           disabled={busy}
