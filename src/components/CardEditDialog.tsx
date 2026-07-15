@@ -55,6 +55,9 @@ export default function CardEditDialog({
   const [values, setValues] = useState<Record<string, string>>({});
   // null = no override (auto-fit); number = fixed size in pt
   const [fontSizes, setFontSizes] = useState<Record<string, number | null>>({});
+  // raw text currently in the "Size" field per binding, while the user is typing;
+  // only parsed/clamped into fontSizes on blur so intermediate keystrokes aren't rejected
+  const [fontSizeText, setFontSizeText] = useState<Record<string, string>>({});
 
   const wMm = printSettings.orientation === 'portrait' ? printSettings.heightMm : printSettings.widthMm;
   const hMm = printSettings.orientation === 'portrait' ? printSettings.widthMm : printSettings.heightMm;
@@ -98,19 +101,28 @@ export default function CardEditDialog({
     if (!record) return;
     const nextValues: Record<string, string> = {};
     const nextSizes: Record<string, number | null> = {};
+    const nextSizeText: Record<string, string> = {};
     bindings.forEach(({ binding }) => {
       nextValues[binding] = getValue(record, binding);
-      nextSizes[binding] = record.fontSizeOverrides?.[binding] ?? null;
+      const size = record.fontSizeOverrides?.[binding] ?? null;
+      nextSizes[binding] = size;
+      nextSizeText[binding] = size == null ? '' : String(size);
     });
     setValues(nextValues);
     setFontSizes(nextSizes);
+    setFontSizeText(nextSizeText);
   }, [record, bindings, open]);
 
   const handleChange = (binding: string, value: string) => {
     setValues((prev) => ({ ...prev, [binding]: value }));
   };
 
-  const handleFontSizeChange = (binding: string, raw: string) => {
+  const handleFontSizeTextChange = (binding: string, raw: string) => {
+    setFontSizeText((prev) => ({ ...prev, [binding]: raw }));
+  };
+
+  const handleFontSizeBlur = (binding: string) => {
+    const raw = fontSizeText[binding] ?? '';
     if (raw === '') {
       setFontSizes((prev) => ({ ...prev, [binding]: null }));
       return;
@@ -118,6 +130,10 @@ export default function CardEditDialog({
     const n = parseInt(raw, 10);
     if (!Number.isNaN(n) && n >= 4 && n <= 144) {
       setFontSizes((prev) => ({ ...prev, [binding]: n }));
+      setFontSizeText((prev) => ({ ...prev, [binding]: String(n) }));
+    } else {
+      const prevValid = fontSizes[binding];
+      setFontSizeText((prev) => ({ ...prev, [binding]: prevValid == null ? '' : String(prevValid) }));
     }
   };
 
@@ -241,8 +257,9 @@ export default function CardEditDialog({
                   <TextField
                     size="small"
                     label="Size"
-                    value={sizeVal ?? ''}
-                    onChange={(e) => handleFontSizeChange(binding, e.target.value)}
+                    value={fontSizeText[binding] ?? ''}
+                    onChange={(e) => handleFontSizeTextChange(binding, e.target.value)}
+                    onBlur={() => handleFontSizeBlur(binding)}
                     placeholder="Auto"
                     type="number"
                     inputProps={{ min: 4, max: 144, step: 1, onWheel: (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur() }}
@@ -258,7 +275,10 @@ export default function CardEditDialog({
                     variant="caption"
                     color="text.secondary"
                     sx={{ cursor: 'pointer', alignSelf: 'flex-end', '&:hover': { color: 'primary.main' } }}
-                    onClick={() => setFontSizes((prev) => ({ ...prev, [binding]: null }))}
+                    onClick={() => {
+                      setFontSizes((prev) => ({ ...prev, [binding]: null }));
+                      setFontSizeText((prev) => ({ ...prev, [binding]: '' }));
+                    }}
                   >
                     Reset to auto-fit
                   </Typography>
