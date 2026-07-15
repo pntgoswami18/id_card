@@ -13,12 +13,12 @@ npm run dev      # dev server on http://localhost:5173 (also on LAN via 0.0.0.0)
 npm run build    # tsc -b && vite build
 npm run lint     # ESLint
 npm run preview  # preview production build
-npm run test     # vitest run (unit tests for the IndexedDB storage layer)
+npm run test     # vitest run (storage layer, appState reducer, pure-logic utils, and a growing set of component tests)
 ```
 
 **`launch-app.bat`** (Windows) — one-click launcher that checks for Node.js, npm, and git (errors with install instructions if missing), pulls latest from `origin/main`, runs `npm install`, then starts the dev server and opens the app in the default browser automatically.
 
-Test coverage is currently limited to the storage layer (`src/utils/idbStore.test.ts`, `src/utils/storageMigration.test.ts`, run via Vitest + fake-indexeddb) — no component/UI tests exist yet.
+Test coverage spans the IndexedDB/FSA storage layer (`src/utils/*.test.ts`, run via Vitest + fake-indexeddb — includes `assetStore`, `fileHandleStore`, `workspaceFile` with mocked File System Access API, and `exportImages` with mocked `html2canvas`), the `appState` reducer (`src/store/appState.test.ts`), pure-logic utils (`csv.ts`, `id.ts`, `file.ts`, `saveFile.ts`, `aggregatePdf.ts`, `importImages.ts`, and `PrintSettings.tsx`'s `computeLayout`/`computeEffectivePaperDims`), and a growing set of component tests (`@testing-library/react`) — `WebcamCapture`, `ColumnMapping`, `CsvUpload`, `PrintView`, `PreviewGrid`, `TemplatePicker` so far, with `TemplatePicker.test.tsx` exercising the real IndexedDB-backed `userTemplates.ts` layer rather than mocking it. `src/setupTests.ts` polyfills several jsdom gaps every test that touches files/canvas/fonts/portals will otherwise hit — see its comments (`Blob.text`/`arrayBuffer`, `URL.createObjectURL`/`revokeObjectURL`, `document.fonts`, `ResizeObserver`, and a global RTL `afterEach(cleanup)` — see `src/utils/CLAUDE.md` § "Tests" for why the last one is required in this repo specifically). Note: `vitest.config.ts`'s `setupFiles` uses an explicit relative path for `fake-indexeddb/auto` rather than the bare specifier — the bare specifier can resolve to the wrong project's `node_modules` in a nested git-worktree checkout.
 
 ## Architecture
 
