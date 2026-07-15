@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Checkbox from '@mui/material/Checkbox';
 import CardCanvas from './CardCanvas';
 import { touchTarget44 } from '../utils/a11y';
+import { elevation } from '../theme/tokens';
 import type { CardRecord, Template } from '../types';
 
 const CARD_PREVIEW_WIDTH_PX = 200;
@@ -87,7 +88,7 @@ export default function PreviewGrid({
                 overflow: 'hidden',
                 flexShrink: 0,
                 // Matches the floating card-preview elevation used in CardEditDialog.
-                boxShadow: 3,
+                boxShadow: elevation.floatingCardPreview,
               }}
             >
               <Box

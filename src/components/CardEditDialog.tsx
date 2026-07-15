@@ -9,6 +9,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import InputAdornment from '@mui/material/InputAdornment';
 import CardCanvas from './CardCanvas';
+import { elevation } from '../theme/tokens';
 import type { CardRecord, Template } from '../types';
 
 interface BindingDef {
@@ -157,7 +158,7 @@ export default function CardEditDialog({
                 height: previewHeight,
                 position: 'relative',
                 overflow: 'hidden',
-                boxShadow: 3,
+                boxShadow: elevation.floatingCardPreview,
                 flexShrink: 0,
               }}
             >

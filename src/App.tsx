@@ -30,6 +30,7 @@ class StepErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
   }
 }
 import theme from './theme';
+import { elevation } from './theme/tokens';
 import { AppStateProvider, useAppState, useAppDispatch } from './store/AppStateContext';
 import {
   getWorkspaceList,
@@ -350,7 +351,7 @@ function AppContent() {
                     cursor: isDisabled ? 'not-allowed' : 'pointer',
                     ...(isActive && {
                       bgcolor: 'primary.main',
-                      boxShadow: 2,
+                      boxShadow: elevation.controlActive,
                       '& .MuiStepLabel-label': { color: 'primary.contrastText' },
                       '& .MuiStepIcon-root': { color: 'primary.contrastText' },
                       '& .MuiStepIcon-text': { fill: 'primary.main' },
@@ -366,7 +367,7 @@ function AppContent() {
                     ...(!isActive && !isDisabled && {
                       '&:hover': {
                         bgcolor: 'action.hover',
-                        boxShadow: 1,
+                        boxShadow: elevation.controlHover,
                       },
                     }),
                   }}
