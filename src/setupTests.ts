@@ -1,4 +1,15 @@
+import { afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+
+// @testing-library/react only auto-registers its afterEach(cleanup) when it
+// detects `afterEach` as a real global (i.e. `test.globals: true`). This repo
+// imports describe/it/expect/etc. explicitly instead of using Vitest globals,
+// so without this, unmounted component trees (and any Portal-rendered content,
+// e.g. MUI Dialog/Select) would leak into the next test in the same file.
+afterEach(() => {
+  cleanup();
+});
 
 // jsdom's Blob/File implementation doesn't include text()/arrayBuffer() (as of
 // jsdom 24) — polyfill via FileReader, which jsdom does implement, so product

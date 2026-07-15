@@ -45,13 +45,12 @@ describe('setStoredHandle / getStoredHandle', () => {
     expect(await getStoredHandle('root-a')).toEqual({ name: 'second.idcard' });
   });
 
-  // NOTE: utils/CLAUDE.md documents that a non-cloneable handle "fails silently rather
-  // than throwing", but IDBObjectStore.put() throws DataCloneError *synchronously*
-  // (spec behavior, not routed through tx.onerror), and setStoredHandle has no
-  // try/catch around the put() call — so today this actually rejects. Pinning the
-  // real behavior here rather than the documented one; see task_d0a5a24e for the fix.
-  it('currently rejects (does not fail silently) when the handle is not structured-cloneable', async () => {
-    await expect(setStoredHandle('root-b', nonCloneableHandle('b.idcard'))).rejects.toThrow();
+  // IDBObjectStore.put() throws DataCloneError *synchronously* for a non-cloneable
+  // value (spec behavior, not routed through tx.onerror). setStoredHandle wraps the
+  // transaction/put() call in a try/catch so this resolves to a safe default instead
+  // of throwing, per the module's documented contract (see PR #6).
+  it('fails silently (does not throw) when the handle is not structured-cloneable', async () => {
+    await expect(setStoredHandle('root-b', nonCloneableHandle('b.idcard'))).resolves.toBeUndefined();
     expect(await getStoredHandle('root-b')).toBeNull();
   });
 });
