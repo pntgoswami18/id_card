@@ -20,6 +20,7 @@
 - **testHelpers.ts** — Shared Vitest helpers. `clearAllStores()` wipes every `id_card_store` object store between tests; the storage-layer suites call it in `beforeEach` (see "Tests" below).
 - **id.ts** — `generateId(prefix?)` — monotonic unique element IDs (prefix + timestamp + counter).
 - **printPresets.ts** — Async IndexedDB CRUD (via `idbStore.ts`) for user-saved print presets. `loadPrintPresets`/`savePrintPreset`/`deletePrintPreset` are `Promise`-returning; `replacePrintPresets` (clear + `putMany`) backs `backup.ts`'s restore path.
+- **a11y.ts** — `touchTarget44`, an `sx` snippet (`position: relative` + an absolutely-centered, invisible 44×44 `::after`) that expands a control's tappable area to the WCAG/Material 44px minimum without inflating its visible size. Spread onto any MUI `Checkbox`/`IconButton` that renders smaller than 44px (e.g. `size="small"`); requires the target to keep normal position layout (not `position: fixed`).
 
 ## Persisted storage
 

@@ -40,10 +40,10 @@ describe('ColumnMapping', () => {
         onUploadDifferent={vi.fn()}
       />,
     );
-    // ColumnMapping doesn't link InputLabel<->Select via labelId/id (flagged separately),
-    // so the accessible name isn't queryable — assert dedup via combobox count instead:
     // 3 bound elements (name, photo, name-again) collapse to 2 unique dropdowns.
     expect(screen.getAllByRole('combobox')).toHaveLength(2);
+    expect(screen.getByRole('combobox', { name: 'name' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'photo' })).toBeInTheDocument();
   });
 
   it('disables Generate Cards until at least one field is mapped', () => {
@@ -119,8 +119,7 @@ describe('ColumnMapping', () => {
         onUploadDifferent={vi.fn()}
       />,
     );
-    // uniqueBindings preserves first-seen element order: 'name' (from e1) before 'photo' (from e2).
-    await user.click(screen.getAllByRole('combobox')[0]);
+    await user.click(screen.getByRole('combobox', { name: 'name' }));
     await user.click(await screen.findByRole('option', { name: 'Full Name' }));
     expect(onMappingChange).toHaveBeenCalledWith({ photo: 'Photo URL', name: 'Full Name' });
   });

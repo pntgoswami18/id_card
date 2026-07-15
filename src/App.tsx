@@ -30,6 +30,7 @@ class StepErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
   }
 }
 import theme from './theme';
+import { elevation } from './theme/tokens';
 import { AppStateProvider, useAppState, useAppDispatch } from './store/AppStateContext';
 import {
   getWorkspaceList,
@@ -350,15 +351,23 @@ function AppContent() {
                     cursor: isDisabled ? 'not-allowed' : 'pointer',
                     ...(isActive && {
                       bgcolor: 'primary.main',
-                      boxShadow: 2,
+                      boxShadow: elevation.controlActive,
                       '& .MuiStepLabel-label': { color: 'primary.contrastText' },
                       '& .MuiStepIcon-root': { color: 'primary.contrastText' },
                       '& .MuiStepIcon-text': { fill: 'primary.main' },
                     }),
+                    // MUI's default MuiStepIcon color for the "not yet reached" (not active,
+                    // not completed) state is theme.palette.text.disabled — ~2.3:1 against the
+                    // paper surface, well under the 3:1 UI-component floor. Re-target it to
+                    // text.secondary (~5.7:1) for steps a user can still click into; genuinely
+                    // disabled steps keep the dim default since WCAG exempts disabled controls.
+                    ...(!isActive && !isCompleted && !isDisabled && {
+                      '& .MuiStepIcon-root': { color: 'text.secondary' },
+                    }),
                     ...(!isActive && !isDisabled && {
                       '&:hover': {
                         bgcolor: 'action.hover',
-                        boxShadow: 1,
+                        boxShadow: elevation.controlHover,
                       },
                     }),
                   }}

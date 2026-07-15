@@ -11,6 +11,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import { touchTarget44 } from '../utils/a11y';
 
 type Photo = { name: string; dataUrl: string };
 
@@ -153,7 +154,7 @@ export default function BulkPhotoModal({ photos, recordCount, onConfirm, onClose
               <IconButton
                 size="small"
                 onClick={() => handleRemove(index)}
-                sx={{ flexShrink: 0, ml: 0.5 }}
+                sx={{ flexShrink: 0, ml: 0.5, ...touchTarget44 }}
                 aria-label={`Remove ${photo.name}`}
               >
                 <CloseIcon fontSize="small" />
