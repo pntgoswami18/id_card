@@ -93,29 +93,29 @@ describe('CardEditDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  // NOTE: the Size field is a controlled input validated per-keystroke (handleFontSizeChange
-  // rejects any value outside [4,144] and the rejection resets the field to its previous
-  // value). That means typing "20" digit-by-digit via userEvent.type() never actually reaches
-  // "20" — '2' alone is rejected (2<4) and resets to '', then '0' alone is also rejected — a
-  // real bug flagged separately (task_328f6b67). fireEvent.change() (a single "paste"-style
-  // event, unlike per-keystroke typing) is used here to still exercise the accept/reject logic.
-  it('setting a font size within range shows "Reset to auto-fit", and clicking it clears the override', async () => {
+  // The Size field's displayed text (fontSizeText) is decoupled from the committed value
+  // (fontSizes) — onChange only updates the raw text, and parsing/clamping to [4,144] happens
+  // on blur (or Enter). fireEvent.blur() is used here to commit after fireEvent.change().
+  it('setting a font size within range commits on blur, shows "Reset to auto-fit", and clicking it clears the override', async () => {
     const user = userEvent.setup();
     render(<CardEditDialog {...baseProps()} />);
     const sizeField = await screen.findByLabelText('Size');
     fireEvent.change(sizeField, { target: { value: '20' } });
+    fireEvent.blur(sizeField);
     expect(await screen.findByText('Reset to auto-fit')).toBeInTheDocument();
 
     await user.click(screen.getByText('Reset to auto-fit'));
     expect(screen.queryByText('Reset to auto-fit')).not.toBeInTheDocument();
   });
 
-  it('ignores a font size outside the 4-144 range', async () => {
+  it('reverts an out-of-range font size to empty on blur', async () => {
     render(<CardEditDialog {...baseProps()} />);
     const sizeField = await screen.findByLabelText('Size');
     fireEvent.change(sizeField, { target: { value: '999' } });
-    // Out-of-range values are rejected by handleFontSizeChange, so no override is set.
+    fireEvent.blur(sizeField);
+    // Out-of-range values are rejected on blur, so no override is set and the field reverts.
     expect(screen.queryByText('Reset to auto-fit')).not.toBeInTheDocument();
+    expect(sizeField).toHaveValue(null);
   });
 
   it('Save reports a fixed font size in the fontSizeOverrides payload', async () => {
@@ -124,20 +124,29 @@ describe('CardEditDialog', () => {
     render(<CardEditDialog {...baseProps()} onSave={onSave} />);
     const sizeField = await screen.findByLabelText('Size');
     fireEvent.change(sizeField, { target: { value: '20' } });
+    fireEvent.blur(sizeField);
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSave.mock.calls[0][1]).toMatchObject({ name: 20 });
   });
 
-  it('BUG (task_328f6b67): typing "20" keystroke-by-keystroke into Size never reaches 20', async () => {
-    // Documents the real bug: '2' alone is rejected (2<4, resets to ''), then '0' alone is
-    // also rejected (0<4) — a user typing normally can never enter this value. This test
-    // should start failing (in a good way) once the fix lands; when it does, update it to
-    // assert the field DOES show '20' and remove this comment.
+  it('fix (task_328f6b67): typing "20" keystroke-by-keystroke into Size reaches "20" and commits on blur', async () => {
     const user = userEvent.setup();
     render(<CardEditDialog {...baseProps()} />);
     const sizeField = await screen.findByLabelText('Size');
     await user.type(sizeField, '20');
-    expect(sizeField).not.toHaveValue(20);
+    expect(sizeField).toHaveValue(20);
+
+    await user.tab();
+    expect(await screen.findByText('Reset to auto-fit')).toBeInTheDocument();
+  });
+
+  it('commits the typed size on Enter without needing to blur first', async () => {
+    const user = userEvent.setup();
+    render(<CardEditDialog {...baseProps()} />);
+    const sizeField = await screen.findByLabelText('Size');
+    await user.type(sizeField, '33{Enter}');
+    expect(sizeField).toHaveValue(33);
+    expect(await screen.findByText('Reset to auto-fit')).toBeInTheDocument();
   });
 
   it('Take Photo calls onTakePhoto', async () => {
