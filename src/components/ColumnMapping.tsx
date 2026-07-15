@@ -48,8 +48,9 @@ export default function ColumnMappingComponent({
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 220px))', gap: 2 }}>
         {uniqueBindings.map((binding) => (
           <FormControl key={binding} fullWidth size="small">
-            <InputLabel>{binding}</InputLabel>
+            <InputLabel id={`col-map-label-${binding}`}>{binding}</InputLabel>
             <Select
+              labelId={`col-map-label-${binding}`}
               value={mapping[binding] ?? ''}
               label={binding}
               onChange={(e) =>
