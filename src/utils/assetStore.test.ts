@@ -83,12 +83,14 @@ describe('storeAssetSync / getAsset', () => {
     const { storeAssetSync } = await freshAssetStore();
     const url = bigDataUrl('persisted-across-sessions');
     const ref = storeAssetSync(url);
-    // storeAssetSync fires the IndexedDB write in the background; give it a tick to land.
-    await new Promise((resolve) => setTimeout(resolve, 20));
 
-    vi.resetModules();
-    const { getAsset: freshGetAsset } = await freshAssetStore();
-    expect(await freshGetAsset(ref)).toBe(url);
+    // storeAssetSync fires the IndexedDB write in the background — poll a fresh,
+    // cache-free module instance until the write lands instead of guessing a fixed delay.
+    await vi.waitFor(async () => {
+      vi.resetModules();
+      const { getAsset: freshGetAsset } = await freshAssetStore();
+      expect(await freshGetAsset(ref)).toBe(url);
+    });
   });
 });
 
