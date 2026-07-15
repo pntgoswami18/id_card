@@ -4,6 +4,8 @@
 
 Renders the right-hand properties panel when a card element is selected in design mode. It is stateless — all state lives in the parent. Every field calls `onUpdate` with a partial `TemplateElement` immediately on change.
 
+Has component tests (`ElementPropertiesPanel.test.tsx`) exercising every gotcha documented below directly: the three render-state guard order, freeSolo `onBlur` capture for all three Autocompletes, the font-size dual-mode commit, the `verticalAlign` deselect-guard, and `binding: undefined` normalization. Its "Font weight" and "Image fit" `Select`s aren't linked to their `InputLabel` via `labelId`/`id` either (same gap as `ColumnMapping.tsx` — see `src/components/CLAUDE.md`), so those tests target the Select by `[aria-haspopup="listbox"]` via `container.querySelector` rather than by accessible name — that attribute is unique to MUI's `Select` combobox and doesn't appear on the Autocomplete comboboxes also present on the same screen.
+
 ## Props
 
 ```ts
