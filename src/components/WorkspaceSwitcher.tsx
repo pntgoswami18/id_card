@@ -158,6 +158,11 @@ export default function WorkspaceSwitcher({
 
   // Root id for the currently active workspace (sub-workspaces share their parent's root).
   const currentRootId = currentMeta?.parentId ?? currentWorkspaceId;
+  // Mirrors currentRootId into a ref so a stale async permission check (e.g. from
+  // setHandleForRoot) can detect the user has since switched to a different workspace
+  // and skip clobbering that workspace's permissionState.
+  const currentRootIdRef = useRef(currentRootId);
+  currentRootIdRef.current = currentRootId;
 
   // Resolves permissionState for a given handle: freshly-acquired handles (same session) have
   // no queryPermission gap and are treated as 'granted'; rehydrated ones need an explicit
@@ -244,7 +249,7 @@ export default function WorkspaceSwitcher({
     if (rootId === currentRootId) {
       setHasFileHandle(true);
       setSavedFileName(handle.name);
-      applyPermissionState(handle);
+      applyPermissionState(handle, () => currentRootIdRef.current !== rootId);
     }
     void setStoredHandle(rootId, handle);
   };
