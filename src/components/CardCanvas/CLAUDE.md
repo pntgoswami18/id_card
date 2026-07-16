@@ -101,3 +101,17 @@ Do not remove the ref mirrors when refactoring — the global handlers depend on
 ## Marquee Selection
 
 Initiated by mousedown on the canvas background element (not on any element). Tracks start/current mouse positions and renders a dashed overlay. On mouseup, computes which elements overlap the marquee rect and calls `onSelectionChange`. Disabled when `watermarkEditMode=true`.
+
+## Tests
+
+`CardCanvas.test.tsx` covers, without needing real pointer/drag simulation beyond `fireEvent.mouseDown`/`mouseMove`(on `document`)/`mouseUp` — the component's own document-level listeners (see "Event Handling Pattern" above) respond to these the same as real mouse events:
+- The `isSafeImageSrc` XSS gate (security-relevant — blocks `data:image/svg`, relative paths; allows `data:image/png|jpeg`, `https://`) for photo elements, backgrounds, and watermarks alike.
+- Background rendering for all three types (solid/gradient/image), including the gradient-direction allowlist falling back to `'to bottom'` for a disallowed value, and the image-background-as-`<img>`-not-CSS constraint.
+- Static (non-edit-mode) watermark rendering: text vs. image, and the same `isSafeImageSrc` gate.
+- Field binding resolution (overrides-over-data, placeholder fallback) and the FitText-bypass conditions (`fontSizeAuto === false`, or a per-record `fontSizeOverrides` entry for the binding).
+- Design-mode selection (mousedown fires `onElementClick` before any drag; Ctrl/Cmd+mousedown selects without dragging), drag-to-move with percent-space clamping to `[0, 100-size]`, resize-handle dragging (only rendered for a single selection), marquee selection, and watermark-edit-mode dragging.
+
+**Test-writing gotchas found while adding these:**
+- Every `<img>` in this component uses `alt=""` (decorative) — per ARIA, an empty `alt` removes the image from the accessibility tree, so `getByRole('img')` never matches. Use `container.querySelector('img')` instead.
+- `role={designMode ? 'button' : undefined}` is gated only on `designMode`, **not** `watermarkEditMode` — an element still has `role="button"` while `watermarkEditMode` is true. What actually changes is `elementsEditable` (`designMode && !watermarkEditMode`), which gates whether `onMouseDown` is attached at all (plus the elements-layer wrapper getting `pointerEvents: 'none'`). Test the *effect* (handler doesn't fire) rather than asserting the role disappears.
+- jsdom returns an all-zero `getBoundingClientRect()` by default, which breaks every percent-space delta calculation (drag, resize, marquee, watermark drag all divide by `bounds.width`/`bounds.height`). Stub `Element.prototype.getBoundingClientRect` to a fixed non-zero rect (e.g. 400×200) for any test exercising these interactions.
