@@ -41,11 +41,15 @@ if %ERRORLEVEL% neq 0 (
 :: left open), its git/node processes can hold file handles inside .git\objects,
 :: which makes the pull below hang on Windows' "Should I try again? (y/n)" retry
 :: prompt. Terminate any leftover git.exe/node.exe processes scoped to this
-:: project folder before touching the repo.
+:: project folder before touching the repo. Note: this matches on command line
+:: alone, so it will also close an unrelated git.exe/node.exe process that
+:: happens to reference this folder (e.g. an IDE's git integration) — an
+:: accepted tradeoff for this single-user dev launcher.
 echo Checking for a previous running instance...
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'git.exe' -or $_.Name -eq 'node.exe') -and $_.ProcessId -ne $PID -and $_.CommandLine -like '*%~dp0*' } | Select-Object -ExpandProperty ProcessId"`) do (
-    echo Closing leftover process %%P from a previous run...
-    taskkill /PID %%P /F >nul 2>nul
+set "LAUNCH_APP_DIR=%~dp0"
+for /f "usebackq tokens=1,2,* delims=|" %%A in (`powershell -NoProfile -Command "$dir = $env:LAUNCH_APP_DIR; Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'git.exe' -or $_.Name -eq 'node.exe') -and $_.CommandLine -like ('*' + $dir + '*') } | ForEach-Object { '{0}|{1}|{2}' -f $_.ProcessId, $_.Name, $_.CommandLine }"`) do (
+    echo Closing leftover process %%A ^(%%B: %%C^) from a previous run...
+    taskkill /PID %%A /F >nul 2>nul
 )
 
 :: Pull latest changes from main (non-fatal — continues with current version if offline or conflicted)
