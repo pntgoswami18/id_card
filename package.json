@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "download-node-runtimes": "node scripts/download-node-runtimes.js",
+    "build-installer": "node scripts/build-installer.js"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
