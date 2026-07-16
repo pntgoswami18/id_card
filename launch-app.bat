@@ -44,13 +44,17 @@ if %ERRORLEVEL% neq 0 (
 :: project folder before touching the repo. Note: this matches on command line
 :: alone, so it will also close an unrelated git.exe/node.exe process that
 :: happens to reference this folder (e.g. an IDE's git integration) — an
-:: accepted tradeoff for this single-user dev launcher.
+:: accepted tradeoff for this single-user dev launcher. It also won't catch a
+:: leftover process if this folder was opened via a different path form (a
+:: mapped drive, UNC path, or symlink) than the one that started it.
+::
+:: The match/echo/kill all happen inside PowerShell (rather than parsing
+:: fields back out in batch) so the process's raw CommandLine — which can
+:: contain characters like & | < > that cmd.exe would otherwise misparse —
+:: never has to pass through an unquoted batch command.
 echo Checking for a previous running instance...
 set "LAUNCH_APP_DIR=%~dp0"
-for /f "usebackq tokens=1,2,* delims=|" %%A in (`powershell -NoProfile -Command "$dir = $env:LAUNCH_APP_DIR; Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'git.exe' -or $_.Name -eq 'node.exe') -and $_.CommandLine -like ('*' + $dir + '*') } | ForEach-Object { '{0}|{1}|{2}' -f $_.ProcessId, $_.Name, $_.CommandLine }"`) do (
-    echo Closing leftover process %%A ^(%%B: %%C^) from a previous run...
-    taskkill /PID %%A /F >nul 2>nul
-)
+powershell -NoProfile -Command "$dir = $env:LAUNCH_APP_DIR; Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'git.exe' -or $_.Name -eq 'node.exe') -and $_.CommandLine.IndexOf($dir, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 } | ForEach-Object { Write-Host \"Closing leftover process $($_.ProcessId) ($($_.Name)) from a previous run...\"; Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
 
 :: Pull latest changes from main (non-fatal — continues with current version if offline or conflicted)
 echo Updating from remote main branch...
