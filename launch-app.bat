@@ -37,6 +37,17 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
+:: If an earlier instance of this app is still running (e.g. a previous window
+:: left open), its git/node processes can hold file handles inside .git\objects,
+:: which makes the pull below hang on Windows' "Should I try again? (y/n)" retry
+:: prompt. Terminate any leftover git.exe/node.exe processes scoped to this
+:: project folder before touching the repo.
+echo Checking for a previous running instance...
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'git.exe' -or $_.Name -eq 'node.exe') -and $_.ProcessId -ne $PID -and $_.CommandLine -like '*%~dp0*' } | Select-Object -ExpandProperty ProcessId"`) do (
+    echo Closing leftover process %%P from a previous run...
+    taskkill /PID %%P /F >nul 2>nul
+)
+
 :: Pull latest changes from main (non-fatal — continues with current version if offline or conflicted)
 echo Updating from remote main branch...
 git fetch origin main
