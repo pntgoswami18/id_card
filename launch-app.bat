@@ -54,7 +54,7 @@ if %ERRORLEVEL% neq 0 (
 :: never has to pass through an unquoted batch command.
 echo Checking for a previous running instance...
 set "LAUNCH_APP_DIR=%~dp0"
-powershell -NoProfile -Command "$dir = $env:LAUNCH_APP_DIR; Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'git.exe' -or $_.Name -eq 'node.exe') -and $_.CommandLine.IndexOf($dir, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 } | ForEach-Object { Write-Host \"Closing leftover process $($_.ProcessId) ($($_.Name)) from a previous run...\"; Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+powershell -NoProfile -Command "$dir = $env:LAUNCH_APP_DIR; if ($dir) { Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'git.exe' -or $_.Name -eq 'node.exe') -and $_.CommandLine -and $_.CommandLine.IndexOf($dir, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 } | ForEach-Object { Write-Host \"Closing leftover process $($_.ProcessId) ($($_.Name)) from a previous run...\"; Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }"
 
 :: Pull latest changes from main (non-fatal — continues with current version if offline or conflicted)
 echo Updating from remote main branch...
