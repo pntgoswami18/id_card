@@ -48,6 +48,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('PreviewStep — empty state', () => {
@@ -242,6 +243,5 @@ describe('PreviewStep — card edit + photo capture flow', () => {
 
     getContext.mockRestore();
     toDataURL.mockRestore();
-    vi.unstubAllGlobals();
   });
 });

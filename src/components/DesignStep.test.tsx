@@ -8,6 +8,15 @@ import { clearAllStores } from '../utils/testHelpers';
 import { saveUserTemplate, loadUserTemplates } from '../utils/userTemplates';
 import type { Template } from '../types';
 
+// Save/Save-As-Template also calls saveTemplateWithPicker to export a .idtemplate file.
+// jsdom has no FSA support and no real navigation, so the unmocked `<a download>` fallback
+// logs a "Not implemented: navigation" error — mock it out since the file-export path itself
+// is covered by workspaceFile.test.ts.
+vi.mock('../utils/workspaceFile', async () => {
+  const actual = await vi.importActual<typeof import('../utils/workspaceFile')>('../utils/workspaceFile');
+  return { ...actual, saveTemplateWithPicker: vi.fn().mockResolvedValue(undefined) };
+});
+
 function StateProbe() {
   const { activeStep, template, printSettings, currentTemplateSource } = useAppState();
   return (
@@ -73,12 +82,22 @@ describe('DesignStep — element selection and deletion', () => {
     renderDesignStep({ initialState: { template: template() } });
     fireEvent.click(await screen.findByRole('button', { name: 'Add Text' }));
     await waitFor(() => expect(probe()).toHaveAttribute('data-element-count', '1'));
+    expect(await screen.findByText('Text element')).toBeInTheDocument();
 
-    // Deselect first (Add* auto-selects), then re-select via canvas mousedown to prove the click path works.
+    // Add Label switches selection away from Text (Add* auto-selects the new element),
+    // so the properties panel now shows Label instead of Text.
+    fireEvent.click(screen.getByRole('button', { name: 'Add Label' }));
+    await waitFor(() => expect(probe()).toHaveAttribute('data-element-count', '2'));
+    expect(await screen.findByText('Label element')).toBeInTheDocument();
+    expect(screen.queryByText('Text element')).not.toBeInTheDocument();
+
+    // Mousedown on the canvas Text element should re-select it, proving the click-to-select
+    // path (not just Add*'s auto-select) actually drives selection.
     // Exact name 'Text' (the canvas element's own rendered content) distinguishes it from 'Add Text'.
     const canvasElement = screen.getByRole('button', { name: 'Text' });
     fireEvent.mouseDown(canvasElement);
     expect(await screen.findByText('Text element')).toBeInTheDocument();
+    expect(screen.queryByText('Label element')).not.toBeInTheDocument();
   });
 
   it('Delete Element removes the selected element', async () => {

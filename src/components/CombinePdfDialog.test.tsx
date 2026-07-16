@@ -69,6 +69,11 @@ describe('CombinePdfDialog — workspaces tab', () => {
     await user.click(screen.getByRole('button', { name: 'Generate PDF' }));
 
     await waitFor(() => expect(aggregateCardsToPdf).toHaveBeenCalled());
+    const [cards, options] = vi.mocked(aggregateCardsToPdf).mock.calls[0];
+    // The mocked renderCardsToImages always resolves one rendered card regardless of record count.
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ dataUrl: 'data:image/jpeg;base64,x' });
+    expect(options).toMatchObject({ paperWidthMm: defaultPaper.paperWidthMm, paperHeightMm: defaultPaper.paperHeightMm });
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -100,7 +105,7 @@ describe('CombinePdfDialog — images tab', () => {
     expect(screen.getByRole('button', { name: 'Generate PDF' })).toBeEnabled();
   });
 
-  it('shows manual size fields for unsized images and warns', async () => {
+  it('shows manual size fields for an image with no manifest size', async () => {
     const user = userEvent.setup();
     render(<CombinePdfDialog open onClose={vi.fn()} defaultPaper={defaultPaper} />);
     await user.click(screen.getByRole('tab', { name: 'From exported images' }));
