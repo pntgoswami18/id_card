@@ -159,23 +159,29 @@ export default function WorkspaceSwitcher({
   // Root id for the currently active workspace (sub-workspaces share their parent's root).
   const currentRootId = currentMeta?.parentId ?? currentWorkspaceId;
 
+  // Resolves permissionState for a given handle: freshly-acquired handles (same session) have
+  // no queryPermission gap and are treated as 'granted'; rehydrated ones need an explicit
+  // permission check since the browser may require a fresh user gesture to re-grant write
+  // access. `isCancelled` lets callers (like the effect below) opt out of a stale async update.
+  const applyPermissionState = (handle: WorkspaceFileHandle | undefined, isCancelled?: () => boolean) => {
+    if (!handle) { setPermissionState('unknown'); return; }
+    if (typeof handle.queryPermission !== 'function') { setPermissionState('granted'); return; }
+    void handle.queryPermission({ mode: 'readwrite' }).then((state) => {
+      if (!isCancelled?.()) setPermissionState(state === 'granted' ? 'granted' : 'needs-reconnect');
+    }).catch(() => { if (!isCancelled?.()) setPermissionState('needs-reconnect'); });
+  };
+
   // Sync hasFileHandle / savedFileName / permissionState from the map whenever the active
   // workspace changes, or whenever App.tsx finishes rehydrating handles from IndexedDB
-  // (handleRehydrationTick). Freshly-acquired handles (same session) have no queryPermission
-  // gap and are treated as 'granted'; rehydrated ones need an explicit permission check since
-  // the browser may require a fresh user gesture to re-grant write access.
+  // (handleRehydrationTick).
   useEffect(() => {
     const handle = fileHandleRef.current.get(currentRootId);
     setHasFileHandle(!!handle);
     setSavedFileName(handle?.name ?? null);
     setReconnectError(null);
     setBannerDismissed(false);
-    if (!handle) { setPermissionState('unknown'); return; }
-    if (typeof handle.queryPermission !== 'function') { setPermissionState('granted'); return; }
     let cancelled = false;
-    void handle.queryPermission({ mode: 'readwrite' }).then((state) => {
-      if (!cancelled) setPermissionState(state === 'granted' ? 'granted' : 'needs-reconnect');
-    }).catch(() => { if (!cancelled) setPermissionState('needs-reconnect'); });
+    applyPermissionState(handle, () => cancelled);
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspaceId, handleRehydrationTick]);
@@ -238,6 +244,7 @@ export default function WorkspaceSwitcher({
     if (rootId === currentRootId) {
       setHasFileHandle(true);
       setSavedFileName(handle.name);
+      applyPermissionState(handle);
     }
     void setStoredHandle(rootId, handle);
   };
