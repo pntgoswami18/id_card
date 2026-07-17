@@ -50,6 +50,7 @@ import {
 } from './utils/workspaceFile';
 import { getAllStoredHandles } from './utils/fileHandleStore';
 import WorkspaceSwitcher from './components/WorkspaceSwitcher';
+import CombineExportButton from './components/CombineExportButton';
 
 const DesignStep = lazy(() => import('./components/DesignStep'));
 const DataStep = lazy(() => import('./components/DataStep'));
@@ -300,22 +301,25 @@ function AppContent() {
           <Typography variant="h4" component="h1">
             ID Card Generator
           </Typography>
-          <WorkspaceSwitcher
-            workspaceList={workspaceList}
-            currentWorkspaceId={currentWorkspaceId}
-            currentWorkspaceLogo={currentWorkspaceLogo}
-            autoSaveToFile={autoSaveToFile}
-            onAutoSaveToFileChange={(v) => { setAutoSaveToFile(v); setAutoSavePref(v); }}
-            fileHandleRef={fileHandleRef}
-            handleRehydrationTick={handleRehydrationVersion}
-            onSaveCurrent={handleSaveCurrent}
-            onLoadWorkspace={handleLoadWorkspace}
-            onSetCurrentWorkspace={handleSetCurrentWorkspace}
-            onSetWorkspaceList={handleSetWorkspaceList}
-            onSetWorkspaceLogo={handleSetWorkspaceLogo}
-            needsSetup={needsSetup}
-            onSetupDone={() => setNeedsSetup(false)}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <CombineExportButton printSettings={printSettings} />
+            <WorkspaceSwitcher
+              workspaceList={workspaceList}
+              currentWorkspaceId={currentWorkspaceId}
+              currentWorkspaceLogo={currentWorkspaceLogo}
+              autoSaveToFile={autoSaveToFile}
+              onAutoSaveToFileChange={(v) => { setAutoSaveToFile(v); setAutoSavePref(v); }}
+              fileHandleRef={fileHandleRef}
+              handleRehydrationTick={handleRehydrationVersion}
+              onSaveCurrent={handleSaveCurrent}
+              onLoadWorkspace={handleLoadWorkspace}
+              onSetCurrentWorkspace={handleSetCurrentWorkspace}
+              onSetWorkspaceList={handleSetWorkspaceList}
+              onSetWorkspaceLogo={handleSetWorkspaceLogo}
+              needsSetup={needsSetup}
+              onSetupDone={() => setNeedsSetup(false)}
+            />
+          </Box>
         </Box>
         <Stepper
           activeStep={activeStep}

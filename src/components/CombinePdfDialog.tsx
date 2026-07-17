@@ -19,10 +19,12 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import Alert from '@mui/material/Alert';
 import LinearProgress from '@mui/material/LinearProgress';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import ToggleButton from '@mui/material/ToggleButton';
 import { getWorkspaceList, getEffectiveWorkspaceData } from '../utils/workspaceStorage';
 import { resolveWorkspaceAssets } from '../utils/assetStore';
 import { touchTarget44 } from '../utils/a11y';
-import { renderCardsToImages } from '../utils/exportImages';
+import { renderCardsToImages, exportCardImagesToZip, type ExportFormat } from '../utils/exportImages';
 import { importCardsFromFiles } from '../utils/importImages';
 import { aggregateCardsToPdf, type CardImage } from '../utils/aggregatePdf';
 
@@ -58,6 +60,10 @@ function detectPaperId(w: number, h: number): string {
 
 export default function CombinePdfDialog({ open, onClose, defaultPaper }: CombinePdfDialogProps) {
   const [tab, setTab] = useState<'workspaces' | 'images'>('workspaces');
+
+  // Output mode: a combined PDF, or a ZIP of individual images.
+  const [outputFormat, setOutputFormat] = useState<'pdf' | 'images'>('pdf');
+  const [imageFormat, setImageFormat] = useState<ExportFormat>('png');
 
   // Paper config (shared by both tabs).
   const [paperId, setPaperId] = useState(() =>
@@ -173,9 +179,11 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
       const { cards: rendered } = await renderCardsToImages(
         plan.data.template, plan.data.records, plan.indices, plan.cw, plan.ch,
         {
-          // JPEG keeps the combined PDF an order of magnitude smaller than PNG;
-          // cards on a white background show no meaningful quality loss.
-          format: 'jpeg',
+          // For the PDF output, JPEG keeps the combined file an order of
+          // magnitude smaller than PNG with no meaningful quality loss on a
+          // white background. For the images-ZIP output, honor whatever
+          // format the user picked instead.
+          format: outputFormat === 'images' ? imageFormat : 'jpeg',
           onProgress: (d) => setProgress({ done: done + d, total }),
         },
       );
@@ -187,6 +195,9 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
     return cards;
   };
 
+  // Imported images already carry their original encoding — the imageFormat
+  // toggle above only controls fresh renders on the "From workspaces" tab,
+  // it does not re-encode already-imported files.
   const generateFromImages = (): CardImage[] => {
     const sized = [...importedSized];
     for (const u of importedUnsized) {
@@ -203,11 +214,17 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
       const cards =
         tab === 'workspaces' ? await generateFromWorkspaces() : generateFromImages();
       setProgress({ done: 0, total: cards.length });
-      await aggregateCardsToPdf(cards, {
-        ...paperConfig(),
-        fileName: 'combined-cards',
-        onProgress: (done, total) => setProgress({ done, total }),
-      });
+      if (outputFormat === 'images') {
+        await exportCardImagesToZip(cards, imageFormat, 'combined-cards', (done, total) =>
+          setProgress({ done, total }),
+        );
+      } else {
+        await aggregateCardsToPdf(cards, {
+          ...paperConfig(),
+          fileName: 'combined-cards',
+          onProgress: (done, total) => setProgress({ done, total }),
+        });
+      }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -218,7 +235,8 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
   };
 
   const totalImages = importedSized.length + importedUnsized.length;
-  const hasValidPaperSize = paperId !== 'custom' || (customWidth > 0 && customHeight > 0);
+  const hasValidPaperSize =
+    outputFormat === 'images' || paperId !== 'custom' || (customWidth > 0 && customHeight > 0);
   const canGenerate =
     !busy &&
     hasValidPaperSize &&
@@ -226,12 +244,40 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Combine into one PDF</DialogTitle>
+      <DialogTitle>Combine / Export Cards</DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Cards are packed densely across all sources, so partially-filled last pages
-          don't waste paper. Cards of different sizes are grouped automatically.
+          {outputFormat === 'pdf'
+            ? 'Cards are packed densely across all sources, so partially-filled last pages don’t waste paper. Cards of different sizes are grouped automatically.'
+            : 'Each card is exported as a separate image file inside a ZIP archive.'}
         </Typography>
+
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={outputFormat}
+          onChange={(_, v) => { if (v) setOutputFormat(v as 'pdf' | 'images'); }}
+          disabled={busy}
+          sx={{ mb: 2 }}
+        >
+          <ToggleButton value="pdf">Combined PDF</ToggleButton>
+          <ToggleButton value="images">Images (ZIP)</ToggleButton>
+        </ToggleButtonGroup>
+
+        {outputFormat === 'images' && (
+          <Box sx={{ mb: 2 }}>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={imageFormat}
+              onChange={(_, v) => { if (v) setImageFormat(v as ExportFormat); }}
+              disabled={busy}
+            >
+              <ToggleButton value="png">PNG</ToggleButton>
+              <ToggleButton value="jpeg">JPG</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        )}
 
         <Tabs
           value={tab}
@@ -315,7 +361,8 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
           </Box>
         )}
 
-        {/* Shared paper settings */}
+        {/* Paper settings — only relevant when generating a combined PDF */}
+        {outputFormat === 'pdf' && (
         <Box sx={{ display: 'flex', gap: 1.5, mt: 3, flexWrap: 'wrap', alignItems: 'center' }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel id="combine-paper-label">Paper</InputLabel>
@@ -374,6 +421,7 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
             sx={{ width: 120 }}
           />
         </Box>
+        )}
 
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 
@@ -393,7 +441,7 @@ export default function CombinePdfDialog({ open, onClose, defaultPaper }: Combin
       <DialogActions>
         <Button onClick={onClose} disabled={busy}>Cancel</Button>
         <Button variant="contained" onClick={handleGenerate} disabled={!canGenerate}>
-          {busy ? 'Generating…' : 'Generate PDF'}
+          {busy ? 'Generating…' : outputFormat === 'images' ? 'Export ZIP' : 'Generate PDF'}
         </Button>
       </DialogActions>
     </Dialog>

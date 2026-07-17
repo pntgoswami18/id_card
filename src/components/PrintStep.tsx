@@ -11,7 +11,6 @@ import { useAppState, useAppDispatch } from '../store/AppStateContext';
 import PrintSettings, { computeLayout, computeEffectivePaperDims } from './PrintSettings';
 import PrintView from './PrintView';
 import { exportCardsAsImages, type ExportFormat } from '../utils/exportImages';
-import CombinePdfDialog from './CombinePdfDialog';
 
 export default function PrintStep() {
   const { template, records, printSettings, printPresets, selectedCardIndices, workspaceList, currentWorkspaceId } = useAppState();
@@ -21,7 +20,6 @@ export default function PrintStep() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportTotal, setExportTotal] = useState(0);
-  const [combineOpen, setCombineOpen] = useState(false);
 
   const workspaceName = workspaceList.find((w) => w.id === currentWorkspaceId)?.name ?? 'cards';
 
@@ -184,30 +182,6 @@ export default function PrintStep() {
           />
         )}
       </Paper>
-
-      {/* ── Combine into one PDF ── */}
-      <Paper sx={{ p: 2, mt: 2 }} className="no-print">
-        <Typography variant="subtitle2" gutterBottom>Combine into one PDF</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Pack cards from several workspaces — or previously exported images — into a single
-          densely-filled PDF, so partial last pages don't waste paper.
-        </Typography>
-        <Button variant="outlined" onClick={() => setCombineOpen(true)}>
-          Combine cards…
-        </Button>
-      </Paper>
-
-      <CombinePdfDialog
-        open={combineOpen}
-        onClose={() => setCombineOpen(false)}
-        defaultPaper={{
-          paperWidthMm: rawPaperW,
-          paperHeightMm: rawPaperH,
-          paperOrientation,
-          pageMarginMm: margin,
-          cardGapMm: gap,
-        }}
-      />
 
       {records.length === 0 && (
         <Typography color="text.secondary" sx={{ mt: 2 }} className="no-print">
