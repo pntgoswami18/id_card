@@ -154,7 +154,7 @@ describe('WorkspaceSwitcher — creating a workspace (FSA)', () => {
     await waitFor(() => expect(probeList().some((w) => w.name === 'Conference Badges')).toBe(true));
 
     await openMenu(user);
-    expect(await screen.findByText('Conference_Badges.idcard')).toBeInTheDocument();
+    expect(await screen.findByText('Saving to Conference_Badges.idcard')).toBeInTheDocument();
     expect(document.querySelector('input[type="checkbox"]')).toBeEnabled();
   });
 });

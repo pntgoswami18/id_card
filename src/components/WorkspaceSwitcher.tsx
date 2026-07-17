@@ -869,7 +869,7 @@ export default function WorkspaceSwitcher({
                 !hasSaveFilePicker()
                   ? 'Downloads as .idcard file'
                   : hasFileHandle
-                  ? (savedFileName ?? 'Overwrite saved file')
+                  ? (savedFileName ? `Saving to ${savedFileName}` : 'Overwrite saved file')
                   : 'Choose save location'
               }
             />
