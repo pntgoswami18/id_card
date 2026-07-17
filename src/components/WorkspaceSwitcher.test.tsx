@@ -15,6 +15,8 @@ vi.mock('../utils/workspaceFile', async () => {
     hasSaveFilePicker: vi.fn().mockReturnValue(false),
     hasOpenFilePicker: vi.fn().mockReturnValue(false),
     saveWorkspaceWithPicker: vi.fn().mockResolvedValue(null),
+    pickSaveFileHandle: vi.fn().mockResolvedValue(null),
+    downloadWorkspaceFile: vi.fn(),
     writeWorkspaceToHandle: vi.fn().mockResolvedValue(true),
     openWorkspaceFilePickerWithHandle: vi.fn().mockResolvedValue(null),
     readWorkspaceFile: vi.fn(),
@@ -90,7 +92,11 @@ function probeList(): WorkspaceMeta[] {
 }
 
 async function openMenu(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'Switch workspace' }));
+  // The trigger button is briefly disabled while a save is in flight — wait it out
+  // rather than racing a click against it.
+  const trigger = await screen.findByRole('button', { name: 'Switch workspace' });
+  await waitFor(() => expect(trigger).toBeEnabled());
+  await user.click(trigger);
 }
 
 beforeEach(async () => {
@@ -273,12 +279,12 @@ describe('WorkspaceSwitcher — save/open (non-FSA fallback)', () => {
 
   it('clicking "Save Workspace" calls the FSA-fallback save path', async () => {
     const user = userEvent.setup();
-    const { saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+    const { downloadWorkspaceFile } = await import('../utils/workspaceFile');
     const a = await createWorkspace('A');
     render(<Harness initialList={[a]} initialCurrentId={a.id} />);
     await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: /Save Workspace/ }));
-    await waitFor(() => expect(saveWorkspaceWithPicker).toHaveBeenCalled());
+    await waitFor(() => expect(downloadWorkspaceFile).toHaveBeenCalled());
   });
 
   it('opening an invalid file shows an error dialog', async () => {
@@ -471,9 +477,12 @@ describe('WorkspaceSwitcher — unsaved-workspace guard', () => {
   });
 
   it('"Save & switch" saves first, then switches only if the save succeeded', async () => {
-    const { hasSaveFilePicker, saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+    const { hasSaveFilePicker, pickSaveFileHandle, writeWorkspaceToHandle } = await import('../utils/workspaceFile');
     vi.mocked(hasSaveFilePicker).mockReturnValue(true);
-    vi.mocked(saveWorkspaceWithPicker).mockResolvedValue(fsaHandle({ name: 'a.idcard' }));
+    vi.mocked(pickSaveFileHandle).mockResolvedValue(fsaHandle({ name: 'a.idcard' }));
+    // afterEach's restoreAllMocks() wipes the factory-level mockResolvedValue(true)
+    // default after the first test in this file runs, so re-arm it explicitly here.
+    vi.mocked(writeWorkspaceToHandle).mockResolvedValue(true);
 
     const user = userEvent.setup();
     const a = await createWorkspace('A');
@@ -487,15 +496,16 @@ describe('WorkspaceSwitcher — unsaved-workspace guard', () => {
     await waitFor(() => expect(probe()).toHaveAttribute('data-current-id', b.id));
   });
 
-  it('"Save & switch" does not switch if the save picker was cancelled', async () => {
-    const { hasSaveFilePicker, saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+  it('"Save & switch" does not switch if the save picker was cancelled, but still flushes current state', async () => {
+    const { hasSaveFilePicker, pickSaveFileHandle } = await import('../utils/workspaceFile');
     vi.mocked(hasSaveFilePicker).mockReturnValue(true);
-    vi.mocked(saveWorkspaceWithPicker).mockResolvedValue(null); // user cancelled the FSA picker
+    vi.mocked(pickSaveFileHandle).mockResolvedValue(null); // user cancelled the FSA picker
+    const onSaveCurrent = vi.fn().mockResolvedValue(undefined);
 
     const user = userEvent.setup();
     const a = await createWorkspace('A');
     const b = await createWorkspace('B');
-    render(<Harness initialList={[a, b]} initialCurrentId={a.id} />);
+    render(<Harness initialList={[a, b]} initialCurrentId={a.id} onSaveCurrent={onSaveCurrent} />);
     await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: 'B' }));
     await screen.findByText('Workspace not saved');
@@ -503,6 +513,56 @@ describe('WorkspaceSwitcher — unsaved-workspace guard', () => {
     await user.click(screen.getByRole('button', { name: 'Save & switch' }));
     await waitFor(() => expect(screen.queryByText('Workspace not saved')).not.toBeInTheDocument());
     expect(probe()).toHaveAttribute('data-current-id', a.id); // still on A — cancelled save aborts the switch
+    // A cancelled picker shouldn't skip flushing in-memory edits to storage.
+    expect(onSaveCurrent).toHaveBeenCalled();
+  });
+});
+
+describe('WorkspaceSwitcher — Save Workspace (FSA, fresh handle)', () => {
+  it('registers the newly-acquired handle after a successful write (Autosave becomes available)', async () => {
+    const { hasSaveFilePicker, pickSaveFileHandle, writeWorkspaceToHandle } = await import('../utils/workspaceFile');
+    vi.mocked(hasSaveFilePicker).mockReturnValue(true);
+    vi.mocked(pickSaveFileHandle).mockResolvedValue(fsaHandle({ name: 'a.idcard' }));
+    // afterEach's restoreAllMocks() wipes the factory-level mockResolvedValue(true)
+    // default after the first test in this file runs, so re-arm it explicitly here
+    // (see the same note on the "Save & switch" test above).
+    vi.mocked(writeWorkspaceToHandle).mockResolvedValue(true);
+
+    const user = userEvent.setup();
+    const a = await createWorkspace('A');
+    render(<Harness initialList={[a]} initialCurrentId={a.id} />);
+    await openMenu(user);
+    expect(document.querySelector('input[type="checkbox"]')).toBeDisabled(); // no handle yet
+
+    await user.click(screen.getByRole('menuitem', { name: /Save Workspace/ }));
+
+    await openMenu(user);
+    await waitFor(() => expect(document.querySelector('input[type="checkbox"]')).toBeEnabled());
+  });
+
+  it('does not register the handle and returns false when the write itself fails', async () => {
+    const { hasSaveFilePicker, pickSaveFileHandle, writeWorkspaceToHandle } = await import('../utils/workspaceFile');
+    vi.mocked(hasSaveFilePicker).mockReturnValue(true);
+    vi.mocked(pickSaveFileHandle).mockResolvedValue(fsaHandle({ name: 'a.idcard' }));
+    vi.mocked(writeWorkspaceToHandle).mockResolvedValue(false); // write failed (e.g. permission revoked mid-flight)
+
+    const user = userEvent.setup();
+    const a = await createWorkspace('A');
+    const b = await createWorkspace('B');
+    render(<Harness initialList={[a, b]} initialCurrentId={a.id} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: /Save Workspace/ }));
+
+    // A failed write must not register the handle — Autosave stays unavailable.
+    await openMenu(user);
+    expect(document.querySelector('input[type="checkbox"]')).toBeDisabled();
+
+    // And the same failure, reached via "Save & switch", must abort the switch.
+    await user.click(screen.getByRole('menuitem', { name: 'B' }));
+    await screen.findByText('Workspace not saved');
+    await user.click(screen.getByRole('button', { name: 'Save & switch' }));
+    await waitFor(() => expect(screen.queryByText('Workspace not saved')).not.toBeInTheDocument());
+    expect(probe()).toHaveAttribute('data-current-id', a.id); // still on A — failed write aborts the switch
   });
 });
 

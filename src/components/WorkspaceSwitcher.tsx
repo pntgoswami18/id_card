@@ -52,7 +52,9 @@ import {
 } from '../utils/workspaceStorage';
 import {
   saveWorkspaceWithPicker,
+  pickSaveFileHandle,
   writeWorkspaceToHandle,
+  downloadWorkspaceFile,
   openWorkspaceFilePickerWithHandle,
   readWorkspaceFile,
   hasOpenFilePicker,
@@ -466,14 +468,34 @@ export default function WorkspaceSwitcher({
     handleClose();
     setSaving(true);
     try {
-      await onSaveCurrent(); // flush current before reading child data
+      const rootId = currentMeta?.parentId ?? currentWorkspaceId;
+      const rootMeta = workspaceList.find((w) => w.id === rootId);
+      const rootName = rootMeta?.name ?? 'Workspace';
+      const existingHandle = fileHandleRef.current.get(rootId);
+
+      // Acquire the file handle FIRST, before any slow data gathering below.
+      // showSaveFilePicker() requires transient user activation, which a
+      // workspace tree with several sub-workspaces can outlast if the picker
+      // is only requested after awaiting all of their IndexedDB reads/asset
+      // resolution — the picker would then silently fail to open.
+      let handle: WorkspaceFileHandle | null = existingHandle ?? null;
+      let cancelled = false;
+      if (!handle && hasSaveFilePicker()) {
+        handle = await pickSaveFileHandle(rootName);
+        if (!handle) cancelled = true;
+      }
+
+      // Flush current before reading child data — always, even if the picker
+      // above was cancelled, matching the original pre-refactor behavior. The
+      // picker has already resolved by this point either way, so this doesn't
+      // reopen the transient-activation window the reordering above exists to
+      // avoid; it only restores the flush that a cancelled save shouldn't skip.
+      await onSaveCurrent();
+      if (cancelled) return false;
 
       // Always save from the root perspective so children are included.
       // Resolve asset: refs so the .idcard file is self-contained.
-      const rootId = currentMeta?.parentId ?? currentWorkspaceId;
-      const rootMeta = workspaceList.find((w) => w.id === rootId);
       const rootData = await resolveWorkspaceAssets((await getWorkspaceData(rootId)) ?? getDefaultWorkspaceData());
-      const rootName = rootMeta?.name ?? 'Workspace';
 
       const childMetas = workspaceList.filter((w) => w.parentId === rootId);
       const children = await Promise.all(childMetas.map(async (meta) => ({
@@ -481,21 +503,14 @@ export default function WorkspaceSwitcher({
         data: await resolveWorkspaceAssets((await getWorkspaceData(meta.id)) ?? getDefaultWorkspaceData()),
       })));
 
-      const existingHandle = fileHandleRef.current.get(rootId);
-      if (existingHandle) {
-        // Workspace was opened from a file — write back to the same file.
-        await writeWorkspaceToHandle(existingHandle, rootName, rootData, children);
-        return true;
-      } else {
-        const handle = await saveWorkspaceWithPicker(rootName, rootData, children);
-        if (handle) {
-          setHandleForRoot(rootId, handle);
-          return true;
-        }
-        // On non-FSA browsers saveWorkspaceWithPicker triggers a download and returns null.
-        // A download counts as "saved" so we should proceed with the switch.
-        return !hasSaveFilePicker();
+      if (handle) {
+        const ok = await writeWorkspaceToHandle(handle, rootName, rootData, children);
+        if (ok && !existingHandle) setHandleForRoot(rootId, handle);
+        return ok;
       }
+      // Non-FSA browsers: no picker was ever acquired above — fall back to a direct download.
+      downloadWorkspaceFile(rootName, rootData, children);
+      return true;
     } finally {
       setSaving(false);
     }

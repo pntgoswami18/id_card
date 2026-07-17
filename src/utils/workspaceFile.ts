@@ -123,6 +123,33 @@ export async function writeWorkspaceToHandle(
 }
 
 /**
+ * Open the OS save-file picker and return the acquired handle, or null if
+ * cancelled / API unavailable. Does not write any data.
+ *
+ * Callers with slow data to gather (IndexedDB reads, asset resolution across
+ * several sub-workspaces) must call this FIRST, before that work, and write
+ * afterward via `writeWorkspaceToHandle`. `showSaveFilePicker` requires
+ * transient user activation, which real workspace trees with several
+ * sub-workspaces can outlast if the picker is requested only after gathering
+ * all their data — real-world repro: the picker silently never opens.
+ */
+export async function pickSaveFileHandle(name: string): Promise<WorkspaceFileHandle | null> {
+  const w = window as WindowWithFSA;
+  if (!w.showSaveFilePicker) return null;
+  try {
+    return await w.showSaveFilePicker({
+      suggestedName: `${safeName(name)}.idcard`,
+      types: [
+        { description: 'ID Card Workspace', accept: { 'application/json': ['.idcard'] } },
+      ],
+    });
+  } catch (err) {
+    if ((err as DOMException).name !== 'AbortError') console.error('Save workspace failed:', err);
+    return null;
+  }
+}
+
+/**
  * Open the OS save-file picker and save the workspace.
  * Returns the handle for subsequent autosave, or null if cancelled / API unavailable.
  * When API is unavailable, falls back to a direct download.
@@ -137,19 +164,10 @@ export async function saveWorkspaceWithPicker(
     downloadWorkspaceFile(name, data, children);
     return null;
   }
-  try {
-    const handle = await w.showSaveFilePicker({
-      suggestedName: `${safeName(name)}.idcard`,
-      types: [
-        { description: 'ID Card Workspace', accept: { 'application/json': ['.idcard'] } },
-      ],
-    });
-    const ok = await writeWorkspaceToHandle(handle, name, data, children);
-    return ok ? handle : null;
-  } catch (err) {
-    if ((err as DOMException).name !== 'AbortError') console.error('Save workspace failed:', err);
-    return null;
-  }
+  const handle = await pickSaveFileHandle(name);
+  if (!handle) return null;
+  const ok = await writeWorkspaceToHandle(handle, name, data, children);
+  return ok ? handle : null;
 }
 
 /** Fallback download when File System Access API is not available. */

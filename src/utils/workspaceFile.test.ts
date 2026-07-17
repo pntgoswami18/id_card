@@ -5,6 +5,7 @@ import {
   hasSaveFilePicker,
   hasOpenFilePicker,
   writeWorkspaceToHandle,
+  pickSaveFileHandle,
   saveWorkspaceWithPicker,
   downloadWorkspaceFile,
   openWorkspaceWithPicker,
@@ -152,6 +153,41 @@ describe('writeWorkspaceToHandle', () => {
       createWritable: async () => { throw new Error('permission denied'); },
     };
     expect(await writeWorkspaceToHandle(handle, 'W', baseWorkspaceData())).toBe(false);
+  });
+});
+
+describe('pickSaveFileHandle', () => {
+  it('returns null without opening a picker when FSA is unavailable', async () => {
+    const result = await pickSaveFileHandle('My Workspace');
+    expect(result).toBeNull();
+  });
+
+  it('returns the acquired handle on success, without writing anything', async () => {
+    const write = vi.fn();
+    const handle: WorkspaceFileHandle = { name: 'my.idcard', createWritable: async () => ({ write, close: vi.fn() }) };
+    const picker = vi.fn().mockResolvedValue(handle);
+    (window as WinWithFSA).showSaveFilePicker = picker;
+
+    const result = await pickSaveFileHandle('My Workspace');
+    expect(result).toBe(handle);
+    expect(picker).toHaveBeenCalledWith(expect.objectContaining({ suggestedName: 'My_Workspace.idcard' }));
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('returns null without logging when the user cancels (AbortError)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    (window as WinWithFSA).showSaveFilePicker = vi.fn().mockRejectedValue(new DOMException('cancelled', 'AbortError'));
+    const result = await pickSaveFileHandle('W');
+    expect(result).toBeNull();
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns null and logs when the picker fails for a non-abort reason', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    (window as WinWithFSA).showSaveFilePicker = vi.fn().mockRejectedValue(new Error('boom'));
+    const result = await pickSaveFileHandle('W');
+    expect(result).toBeNull();
+    expect(errorSpy).toHaveBeenCalled();
   });
 });
 
