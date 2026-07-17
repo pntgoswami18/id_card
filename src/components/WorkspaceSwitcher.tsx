@@ -479,12 +479,19 @@ export default function WorkspaceSwitcher({
       // is only requested after awaiting all of their IndexedDB reads/asset
       // resolution — the picker would then silently fail to open.
       let handle: WorkspaceFileHandle | null = existingHandle ?? null;
+      let cancelled = false;
       if (!handle && hasSaveFilePicker()) {
         handle = await pickSaveFileHandle(rootName);
-        if (!handle) return false; // cancelled
+        if (!handle) cancelled = true;
       }
 
-      await onSaveCurrent(); // flush current before reading child data
+      // Flush current before reading child data — always, even if the picker
+      // above was cancelled, matching the original pre-refactor behavior. The
+      // picker has already resolved by this point either way, so this doesn't
+      // reopen the transient-activation window the reordering above exists to
+      // avoid; it only restores the flush that a cancelled save shouldn't skip.
+      await onSaveCurrent();
+      if (cancelled) return false;
 
       // Always save from the root perspective so children are included.
       // Resolve asset: refs so the .idcard file is self-contained.
