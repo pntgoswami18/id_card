@@ -14,6 +14,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Switch from '@mui/material/Switch';
+import Checkbox from '@mui/material/Checkbox';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
@@ -59,6 +60,8 @@ import {
   readWorkspaceFile,
   hasOpenFilePicker,
   hasSaveFilePicker,
+  deleteWorkspaceFile,
+  requestRemovePermission,
   type WorkspaceFileHandle,
 } from '../utils/workspaceFile';
 import { setStoredHandle, deleteStoredHandle, getAllStoredHandles } from '../utils/fileHandleStore';
@@ -136,6 +139,8 @@ export default function WorkspaceSwitcher({
   const [editName, setEditName] = useState('');
   const [editLogo, setEditLogo] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteFileFromDisk, setDeleteFileFromDisk] = useState(true);
+  const [deleteFileError, setDeleteFileError] = useState<string | null>(null);
   // duplicate root workspace
   const [dupRootOpen, setDupRootOpen] = useState(false);
   const [dupRootName, setDupRootName] = useState('');
@@ -450,13 +455,39 @@ export default function WorkspaceSwitcher({
   };
 
   // ---- Delete ----
-  const handleDeleteOpen = () => { setDeleteOpen(true); handleClose(); };
+  // Only a root workspace's file can be offered for on-disk deletion — a sub-workspace
+  // shares its root's .idcard file with the root and any siblings, so deleting a
+  // sub-workspace must never touch that file.
+  const isRootDelete = !currentMeta?.parentId;
+  const deletingLinkedFile = isRootDelete && hasFileHandle;
+
+  const handleDeleteOpen = () => {
+    setDeleteFileFromDisk(true);
+    setDeleteFileError(null);
+    setDeleteOpen(true);
+    handleClose();
+  };
 
   const handleDeleteConfirm = async () => {
     if (!currentWorkspaceId) return;
+    const handleToDelete = deletingLinkedFile && deleteFileFromDisk
+      ? fileHandleRef.current.get(currentRootId)
+      : undefined;
+    // Request removal permission immediately, before any slow IndexedDB work below —
+    // requestPermission() requires transient user activation from this click, the same
+    // constraint handleSaveWorkspace works around by acquiring its handle up front.
+    const canRemoveFile = handleToDelete ? await requestRemovePermission(handleToDelete) : false;
     clearHandleForRoot(currentRootId);
     await onSaveCurrent();
     await deleteWorkspaceTree(currentWorkspaceId);
+    if (handleToDelete) {
+      const ok = canRemoveFile && await deleteWorkspaceFile(handleToDelete);
+      if (!ok) {
+        setDeleteFileError(
+          `Removed "${currentMeta?.name}" from your workspace list, but couldn't delete ${handleToDelete.name} from disk. You may need to delete it manually.`,
+        );
+      }
+    }
     const list = await getWorkspaceList();
     const data = await getEffectiveWorkspaceData(list.currentId);
     const toLoad = data ? await resolveWorkspaceAssets(data) : getDefaultWorkspaceData();
@@ -958,6 +989,18 @@ export default function WorkspaceSwitcher({
           </Alert>
         </Snackbar>
 
+        {/* ---- Delete-from-disk failure ---- */}
+        <Snackbar
+          open={deleteFileError !== null}
+          autoHideDuration={8000}
+          onClose={() => setDeleteFileError(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert severity="error" variant="filled" onClose={() => setDeleteFileError(null)}>
+            {deleteFileError}
+          </Alert>
+        </Snackbar>
+
         {/* ---- Reconnect banner ---- */}
         <Snackbar
           open={hasFileHandle && permissionState === 'needs-reconnect' && !bannerDismissed}
@@ -1349,6 +1392,18 @@ export default function WorkspaceSwitcher({
                 This will permanently delete &quot;{currentMeta?.name}&quot; and its saved data.
                 You cannot undo this.
               </Typography>
+            )}
+            {deletingLinkedFile && (
+              <FormControlLabel
+                sx={{ mt: 1 }}
+                control={
+                  <Checkbox
+                    checked={deleteFileFromDisk}
+                    onChange={(e) => setDeleteFileFromDisk(e.target.checked)}
+                  />
+                }
+                label={`Also delete ${savedFileName ?? 'the linked file'} from disk`}
+              />
             )}
           </DialogContent>
           <DialogActions>

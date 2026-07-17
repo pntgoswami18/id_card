@@ -5,6 +5,8 @@ import {
   hasSaveFilePicker,
   hasOpenFilePicker,
   writeWorkspaceToHandle,
+  deleteWorkspaceFile,
+  requestRemovePermission,
   pickSaveFileHandle,
   saveWorkspaceWithPicker,
   downloadWorkspaceFile,
@@ -153,6 +155,79 @@ describe('writeWorkspaceToHandle', () => {
       createWritable: async () => { throw new Error('permission denied'); },
     };
     expect(await writeWorkspaceToHandle(handle, 'W', baseWorkspaceData())).toBe(false);
+  });
+});
+
+describe('requestRemovePermission', () => {
+  it('returns false when the handle does not support remove()', async () => {
+    const handle: WorkspaceFileHandle = { name: 'w.idcard', createWritable: vi.fn() };
+    expect(await requestRemovePermission(handle)).toBe(false);
+  });
+
+  it('requests readwrite permission and returns true when granted', async () => {
+    const requestPermission = vi.fn().mockResolvedValue('granted');
+    const handle: WorkspaceFileHandle = {
+      name: 'w.idcard', createWritable: vi.fn(), requestPermission, remove: vi.fn(),
+    };
+    expect(await requestRemovePermission(handle)).toBe(true);
+    expect(requestPermission).toHaveBeenCalledWith({ mode: 'readwrite' });
+  });
+
+  it('returns true without requesting when the handle has no requestPermission', async () => {
+    const handle: WorkspaceFileHandle = { name: 'w.idcard', createWritable: vi.fn(), remove: vi.fn() };
+    expect(await requestRemovePermission(handle)).toBe(true);
+  });
+
+  it('returns false when permission is denied', async () => {
+    const handle: WorkspaceFileHandle = {
+      name: 'w.idcard',
+      createWritable: vi.fn(),
+      requestPermission: vi.fn().mockResolvedValue('denied'),
+      remove: vi.fn(),
+    };
+    expect(await requestRemovePermission(handle)).toBe(false);
+  });
+
+  it('returns false when requestPermission throws', async () => {
+    const handle: WorkspaceFileHandle = {
+      name: 'w.idcard',
+      createWritable: vi.fn(),
+      requestPermission: vi.fn().mockRejectedValue(new Error('nope')),
+      remove: vi.fn(),
+    };
+    expect(await requestRemovePermission(handle)).toBe(false);
+  });
+});
+
+describe('deleteWorkspaceFile', () => {
+  it('returns false when the handle does not support remove()', async () => {
+    const handle: WorkspaceFileHandle = { name: 'w.idcard', createWritable: vi.fn() };
+    expect(await deleteWorkspaceFile(handle)).toBe(false);
+  });
+
+  it('removes the file and returns true', async () => {
+    const remove = vi.fn().mockResolvedValue(undefined);
+    const handle: WorkspaceFileHandle = { name: 'w.idcard', createWritable: vi.fn(), remove };
+    expect(await deleteWorkspaceFile(handle)).toBe(true);
+    expect(remove).toHaveBeenCalled();
+  });
+
+  it('treats a NotFoundError from remove() as success (already gone)', async () => {
+    const handle: WorkspaceFileHandle = {
+      name: 'w.idcard',
+      createWritable: vi.fn(),
+      remove: vi.fn().mockRejectedValue(new DOMException('gone', 'NotFoundError')),
+    };
+    expect(await deleteWorkspaceFile(handle)).toBe(true);
+  });
+
+  it('returns false when remove() throws a non-NotFoundError', async () => {
+    const handle: WorkspaceFileHandle = {
+      name: 'w.idcard',
+      createWritable: vi.fn(),
+      remove: vi.fn().mockRejectedValue(new DOMException('nope', 'NoModificationAllowedError')),
+    };
+    expect(await deleteWorkspaceFile(handle)).toBe(false);
   });
 });
 
