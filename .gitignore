@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Windows installer build artifacts — downloaded runtimes and generated
+# installer output, not source (see scripts/download-node-runtimes.js and
+# scripts/build-installer.js)
+vendor/
+installer/*.exe
+installer/*.generated.nsi
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
