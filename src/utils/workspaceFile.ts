@@ -16,6 +16,7 @@ export interface WorkspaceFileHandle {
   queryPermission?(opts?: { mode?: 'read' | 'readwrite' }): Promise<FSAPermissionState>;
   requestPermission?(opts?: { mode?: 'read' | 'readwrite' }): Promise<FSAPermissionState>;
   isSameEntry?(other: WorkspaceFileHandle): Promise<boolean>;
+  remove?(opts?: { recursive?: boolean }): Promise<void>;
 }
 type FSAFileHandle = WorkspaceFileHandle & { getFile(): Promise<File> };
 type SavePickerOpts = {
@@ -118,6 +119,41 @@ export async function writeWorkspaceToHandle(
     }
     return true;
   } catch {
+    return false;
+  }
+}
+
+/**
+ * Request readwrite permission for removing a handle's file. Callers must
+ * invoke this immediately on the user gesture (before any slow awaits, e.g.
+ * IndexedDB writes) — requestPermission() requires transient user activation,
+ * the same constraint that motivated splitting pickSaveFileHandle() out of
+ * saveWorkspaceWithPicker() for the Save Workspace flow.
+ */
+export async function requestRemovePermission(handle: WorkspaceFileHandle): Promise<boolean> {
+  if (typeof handle.remove !== 'function') return false;
+  if (typeof handle.requestPermission !== 'function') return true;
+  try {
+    const state = await handle.requestPermission({ mode: 'readwrite' });
+    return state === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Delete the file backing a workspace handle from disk. Assumes readwrite
+ * permission has already been granted (see requestRemovePermission). Returns
+ * true if the file is gone (including "already gone" — NotFoundError), false
+ * if removal failed (e.g. the handle doesn't support removal).
+ */
+export async function deleteWorkspaceFile(handle: WorkspaceFileHandle): Promise<boolean> {
+  if (typeof handle.remove !== 'function') return false;
+  try {
+    await handle.remove();
+    return true;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'NotFoundError') return true;
     return false;
   }
 }
