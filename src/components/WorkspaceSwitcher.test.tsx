@@ -21,6 +21,7 @@ vi.mock('../utils/workspaceFile', async () => {
     openWorkspaceFilePickerWithHandle: vi.fn().mockResolvedValue(null),
     readWorkspaceFile: vi.fn(),
     deleteWorkspaceFile: vi.fn().mockResolvedValue(true),
+    requestRemovePermission: vi.fn().mockResolvedValue(true),
   };
 });
 
@@ -201,6 +202,16 @@ describe('WorkspaceSwitcher — edit', () => {
 });
 
 describe('WorkspaceSwitcher — delete', () => {
+  // afterEach's restoreAllMocks() wipes the factory-level mockResolvedValue(true)
+  // defaults after the first test in the file runs (see the note on the "Save & switch"
+  // test above) — re-arm both here so every test in this block starts from "permission
+  // granted, removal succeeds" without repeating it per test.
+  beforeEach(async () => {
+    const { deleteWorkspaceFile, requestRemovePermission } = await import('../utils/workspaceFile');
+    vi.mocked(deleteWorkspaceFile).mockResolvedValue(true);
+    vi.mocked(requestRemovePermission).mockResolvedValue(true);
+  });
+
   it('disables "Delete current" when there is only one workspace', async () => {
     const user = userEvent.setup();
     const a = await createWorkspace('Only');
@@ -248,6 +259,24 @@ describe('WorkspaceSwitcher — delete', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(deleteWorkspaceFile).toHaveBeenCalledWith(handle));
+  });
+
+  it('requests removal permission before the slow delete work, and skips remove() when denied', async () => {
+    const user = userEvent.setup();
+    const { deleteWorkspaceFile, requestRemovePermission } = await import('../utils/workspaceFile');
+    vi.mocked(requestRemovePermission).mockResolvedValueOnce(false);
+    const a = await createWorkspace('A');
+    const b = await createWorkspace('B');
+    const handle = fsaHandle({ name: 'a.idcard' });
+    render(<Harness initialList={[a, b]} initialCurrentId={a.id} initialHandles={[[a.id, handle]]} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Delete current' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(probeList().some((w) => w.id === a.id)).toBe(false));
+    expect(requestRemovePermission).toHaveBeenCalledWith(handle);
+    expect(deleteWorkspaceFile).not.toHaveBeenCalled();
+    expect(await screen.findByText(/couldn't delete a\.idcard from disk/)).toBeInTheDocument();
   });
 
   it('does not delete the file when the checkbox is unchecked', async () => {

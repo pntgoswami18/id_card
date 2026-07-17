@@ -61,6 +61,7 @@ import {
   hasOpenFilePicker,
   hasSaveFilePicker,
   deleteWorkspaceFile,
+  requestRemovePermission,
   type WorkspaceFileHandle,
 } from '../utils/workspaceFile';
 import { setStoredHandle, deleteStoredHandle, getAllStoredHandles } from '../utils/fileHandleStore';
@@ -467,11 +468,15 @@ export default function WorkspaceSwitcher({
     const handleToDelete = deletingLinkedFile && deleteFileFromDisk
       ? fileHandleRef.current.get(currentRootId)
       : undefined;
+    // Request removal permission immediately, before any slow IndexedDB work below —
+    // requestPermission() requires transient user activation from this click, the same
+    // constraint handleSaveWorkspace works around by acquiring its handle up front.
+    const canRemoveFile = handleToDelete ? await requestRemovePermission(handleToDelete) : false;
     clearHandleForRoot(currentRootId);
     await onSaveCurrent();
     await deleteWorkspaceTree(currentWorkspaceId);
     if (handleToDelete) {
-      const ok = await deleteWorkspaceFile(handleToDelete);
+      const ok = canRemoveFile && await deleteWorkspaceFile(handleToDelete);
       if (!ok) {
         setDeleteFileError(
           `Removed "${currentMeta?.name}" from your workspace list, but couldn't delete ${handleToDelete.name} from disk. You may need to delete it manually.`,
