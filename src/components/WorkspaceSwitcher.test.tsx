@@ -15,6 +15,8 @@ vi.mock('../utils/workspaceFile', async () => {
     hasSaveFilePicker: vi.fn().mockReturnValue(false),
     hasOpenFilePicker: vi.fn().mockReturnValue(false),
     saveWorkspaceWithPicker: vi.fn().mockResolvedValue(null),
+    pickSaveFileHandle: vi.fn().mockResolvedValue(null),
+    downloadWorkspaceFile: vi.fn(),
     writeWorkspaceToHandle: vi.fn().mockResolvedValue(true),
     openWorkspaceFilePickerWithHandle: vi.fn().mockResolvedValue(null),
     readWorkspaceFile: vi.fn(),
@@ -273,12 +275,12 @@ describe('WorkspaceSwitcher — save/open (non-FSA fallback)', () => {
 
   it('clicking "Save Workspace" calls the FSA-fallback save path', async () => {
     const user = userEvent.setup();
-    const { saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+    const { downloadWorkspaceFile } = await import('../utils/workspaceFile');
     const a = await createWorkspace('A');
     render(<Harness initialList={[a]} initialCurrentId={a.id} />);
     await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: /Save Workspace/ }));
-    await waitFor(() => expect(saveWorkspaceWithPicker).toHaveBeenCalled());
+    await waitFor(() => expect(downloadWorkspaceFile).toHaveBeenCalled());
   });
 
   it('opening an invalid file shows an error dialog', async () => {
@@ -471,9 +473,12 @@ describe('WorkspaceSwitcher — unsaved-workspace guard', () => {
   });
 
   it('"Save & switch" saves first, then switches only if the save succeeded', async () => {
-    const { hasSaveFilePicker, saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+    const { hasSaveFilePicker, pickSaveFileHandle, writeWorkspaceToHandle } = await import('../utils/workspaceFile');
     vi.mocked(hasSaveFilePicker).mockReturnValue(true);
-    vi.mocked(saveWorkspaceWithPicker).mockResolvedValue(fsaHandle({ name: 'a.idcard' }));
+    vi.mocked(pickSaveFileHandle).mockResolvedValue(fsaHandle({ name: 'a.idcard' }));
+    // afterEach's restoreAllMocks() wipes the factory-level mockResolvedValue(true)
+    // default after the first test in this file runs, so re-arm it explicitly here.
+    vi.mocked(writeWorkspaceToHandle).mockResolvedValue(true);
 
     const user = userEvent.setup();
     const a = await createWorkspace('A');
@@ -488,9 +493,9 @@ describe('WorkspaceSwitcher — unsaved-workspace guard', () => {
   });
 
   it('"Save & switch" does not switch if the save picker was cancelled', async () => {
-    const { hasSaveFilePicker, saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+    const { hasSaveFilePicker, pickSaveFileHandle } = await import('../utils/workspaceFile');
     vi.mocked(hasSaveFilePicker).mockReturnValue(true);
-    vi.mocked(saveWorkspaceWithPicker).mockResolvedValue(null); // user cancelled the FSA picker
+    vi.mocked(pickSaveFileHandle).mockResolvedValue(null); // user cancelled the FSA picker
 
     const user = userEvent.setup();
     const a = await createWorkspace('A');
