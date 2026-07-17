@@ -135,6 +135,75 @@ describe('WorkspaceSwitcher — creating a workspace (non-FSA fallback)', () => 
   });
 });
 
+describe('WorkspaceSwitcher — creating a workspace (FSA)', () => {
+  it('shows the linked file immediately after creating a workspace via the FSA picker', async () => {
+    // Asserts the correct end state after the handle-registration-ordering fix (see
+    // "WorkspaceSwitcher — register the handle before switching workspace" in
+    // src/components/CLAUDE.md). NOT a true regression test on its own: RTL's act()
+    // wraps this entire async click handler and only flushes effects once it fully
+    // resolves, so reverting the fix's statement order does not make THIS test fail —
+    // the real bug depended on a real browser yielding mid-handler (a genuine IndexedDB
+    // round trip), which jsdom/fake-indexeddb + act() batching don't reproduce on their
+    // own. See the next test below for a variant that forces that yield and does catch
+    // the regression.
+    const { hasSaveFilePicker, saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+    vi.mocked(hasSaveFilePicker).mockReturnValue(true);
+    vi.mocked(saveWorkspaceWithPicker).mockResolvedValue(fsaHandle({ name: 'Conference_Badges.idcard' }));
+
+    const user = userEvent.setup();
+    const meta = await createWorkspace('Existing');
+    render(<Harness initialList={[meta]} initialCurrentId={meta.id} />);
+
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'New workspace' }));
+    await user.type(await screen.findByLabelText('Name'), 'Conference Badges');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(probeList().some((w) => w.name === 'Conference Badges')).toBe(true));
+
+    await openMenu(user);
+    expect(await screen.findByText('Saving to Conference_Badges.idcard')).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector('input[type="checkbox"]')).toBeEnabled());
+  });
+
+  it('(true regression test) still shows the linked file when saveWorkspaceData genuinely yields to a macrotask', async () => {
+    // The test above does NOT actually catch a regression of the ordering fix (see its
+    // comment) because fake-indexeddb resolves via microtasks, so RTL's act() never gets
+    // a chance to flush the stale effect mid-handler. A real browser's IndexedDB request
+    // resolves via a genuine macrotask (a real event-loop turn), which is what actually
+    // lets React commit the onSetCurrentWorkspace render and run the handle-sync effect
+    // before the rest of the handler continues. Reproduce that here by forcing
+    // saveWorkspaceData — the await that historically sat between the dispatch trio and
+    // setHandleForRoot in the buggy version — to yield via a real setTimeout instead of
+    // an immediate microtask. Verified empirically: this test PASSES on the current
+    // (fixed) code and FAILS if the fix's statement order is reverted, unlike the test
+    // above — this one is the actual regression test.
+    const workspaceStorage = await import('../utils/workspaceStorage');
+    const realSaveWorkspaceData = workspaceStorage.saveWorkspaceData;
+    vi.spyOn(workspaceStorage, 'saveWorkspaceData').mockImplementation(async (...args) => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return realSaveWorkspaceData(...args);
+    });
+
+    const { hasSaveFilePicker, saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+    vi.mocked(hasSaveFilePicker).mockReturnValue(true);
+    vi.mocked(saveWorkspaceWithPicker).mockResolvedValue(fsaHandle({ name: 'Conference_Badges.idcard' }));
+
+    const user = userEvent.setup();
+    const meta = await createWorkspace('Existing');
+    render(<Harness initialList={[meta]} initialCurrentId={meta.id} />);
+
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'New workspace' }));
+    await user.type(await screen.findByLabelText('Name'), 'Conference Badges');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(probeList().some((w) => w.name === 'Conference Badges')).toBe(true));
+
+    await openMenu(user);
+    expect(await screen.findByText('Saving to Conference_Badges.idcard')).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector('input[type="checkbox"]')).toBeEnabled());
+  });
+});
+
 describe('WorkspaceSwitcher — sub-workspaces (copy-on-write)', () => {
   it('inherits the parent template/print settings and sets templateLinkedToParent', async () => {
     const user = userEvent.setup();
@@ -537,6 +606,62 @@ describe('WorkspaceSwitcher — duplicate-open detection', () => {
     expect(probeList()).toHaveLength(1);
     expect(probe()).toHaveAttribute('data-current-id', a.id);
   });
+
+  it('shows the linked file immediately after opening a brand-new .idcard file via the FSA picker', async () => {
+    // Covers restoreWorkspaceFile's first-time-open path (no existing match found),
+    // which received the same handle-registration reorder as handleNewWorkspaceConfirm.
+    // Not a true regression test — same act()-batching caveat as the "creating a
+    // workspace (FSA)" test above. Unlike that one, this call site's version of the bug
+    // can't be turned into a true regression test with the "force a real setTimeout yield
+    // on the awaited call between dispatch and registration" technique described there,
+    // either: that technique only works when an existing `await` sits BETWEEN an
+    // already-fired dispatch and the registration call, so forcing it to yield lets
+    // React's effect flush (scheduled on ITS OWN later macrotask) preempt the
+    // continuation. Here, the dispatch trio is the last synchronous code in
+    // restoreWorkspaceFile before it returns, and setHandleForRoot is called by the
+    // caller immediately after `await restoreWorkspaceFile(...)` resolves — with no
+    // `await` positioned between the dispatch and the registration to force-delay.
+    // Delaying an earlier internal call (e.g. saveWorkspaceList, tried and confirmed not
+    // to work) only pushes back *when* the dispatch fires, not the gap after it, since
+    // everything from that delay's resolution through the dispatch, the function's
+    // return, and the caller's registration call all runs within one continuous
+    // microtask-draining pass that a later macrotask-scheduled effect flush cannot
+    // preempt. Verified empirically (both this plain version and the forced-yield
+    // attempt) that reverting restoreWorkspaceFile back to the pre-fix caller pattern
+    // does not make either fail.
+    const { hasOpenFilePicker, hasSaveFilePicker, openWorkspaceFilePickerWithHandle, readWorkspaceFile } =
+      await import('../utils/workspaceFile');
+    vi.mocked(hasOpenFilePicker).mockReturnValue(true);
+    vi.mocked(hasSaveFilePicker).mockReturnValue(true);
+    const openedHandle = fsaHandle({ name: 'Imported.idcard' });
+    vi.mocked(openWorkspaceFilePickerWithHandle).mockResolvedValue({
+      file: new File(['{}'], 'Imported.idcard'), handle: openedHandle,
+    });
+    const wsFile = {
+      version: 1 as const, app: 'id_card_generator' as const, type: 'workspace' as const, savedAt: 'x',
+      name: 'Imported Workspace',
+      data: {
+        template: { id: 't', name: 'T', elements: [], background: null, watermark: null },
+        records: [], columnMapping: {}, printPresets: [],
+        printSettings: { widthMm: 85.6, heightMm: 53.98, orientation: 'landscape' as const },
+        selectedCardIndices: [], currentTemplateSource: null,
+      },
+    };
+    vi.mocked(readWorkspaceFile).mockResolvedValue(wsFile);
+
+    const user = userEvent.setup();
+    const a = await createWorkspace('A');
+    render(<Harness initialList={[a]} initialCurrentId={a.id} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: /^Open Workspace/ }));
+
+    await waitFor(() => expect(probeList().some((w) => w.name === 'Imported Workspace')).toBe(true));
+
+    await openMenu(user);
+    expect(await screen.findByText('Saving to Imported.idcard')).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector('input[type="checkbox"]')).toBeEnabled());
+  });
+
 });
 
 describe('WorkspaceSwitcher — unsaved-workspace guard', () => {
