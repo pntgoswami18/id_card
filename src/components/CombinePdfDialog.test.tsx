@@ -9,6 +9,7 @@ import type { CardRecord } from '../types';
 
 vi.mock('../utils/exportImages', () => ({
   renderCardsToImages: vi.fn(),
+  exportCardImagesToZip: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../utils/aggregatePdf', () => ({
   aggregateCardsToPdf: vi.fn().mockResolvedValue(undefined),
@@ -158,6 +159,49 @@ describe('CombinePdfDialog — paper size', () => {
     await user.clear(widthField);
     await user.type(widthField, '0');
     expect(screen.getByRole('button', { name: 'Generate PDF' })).toBeDisabled();
+  });
+});
+
+describe('CombinePdfDialog — output mode', () => {
+  it('defaults to Combined PDF, with the PNG/JPG toggle and paper settings hidden', async () => {
+    render(<CombinePdfDialog open onClose={vi.fn()} defaultPaper={defaultPaper} />);
+    expect(screen.getByRole('button', { name: 'Generate PDF' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'PNG' })).not.toBeInTheDocument();
+    expect(await screen.findByLabelText('Paper')).toBeInTheDocument();
+  });
+
+  it('switching to Images (ZIP) reveals the PNG/JPG toggle, hides paper settings, and relabels the action button', async () => {
+    const user = userEvent.setup();
+    render(<CombinePdfDialog open onClose={vi.fn()} defaultPaper={defaultPaper} />);
+
+    await user.click(screen.getByRole('button', { name: 'Images (ZIP)' }));
+
+    expect(screen.getByRole('button', { name: 'PNG' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'JPG' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Paper')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export ZIP' })).toBeInTheDocument();
+  });
+
+  it('generates a ZIP of images (not a PDF) from the selected workspace when in Images mode', async () => {
+    const user = userEvent.setup();
+    const { exportCardImagesToZip } = await import('../utils/exportImages');
+    const { aggregateCardsToPdf } = await import('../utils/aggregatePdf');
+    const onClose = vi.fn();
+    await seedWorkspaceWithCards('Badges', 2);
+    render(<CombinePdfDialog open onClose={onClose} defaultPaper={defaultPaper} />);
+
+    await user.click(screen.getByRole('button', { name: 'Images (ZIP)' }));
+    await user.click(screen.getByRole('button', { name: 'JPG' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Badges' }));
+    await user.click(screen.getByRole('button', { name: 'Export ZIP' }));
+
+    await waitFor(() => expect(exportCardImagesToZip).toHaveBeenCalled());
+    const [cards, format, fileName] = vi.mocked(exportCardImagesToZip).mock.calls[0];
+    expect(cards).toHaveLength(1);
+    expect(format).toBe('jpeg');
+    expect(fileName).toBe('combined-cards');
+    expect(aggregateCardsToPdf).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
   });
 });
 

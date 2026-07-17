@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import CardCanvas from '../components/CardCanvas/CardCanvas';
 import type { Template, CardRecord } from '../types';
 import { saveBlob, safeFileName } from './saveFile';
+import type { CardImage } from './aggregatePdf';
 
 export type ExportFormat = 'png' | 'jpeg';
 
@@ -227,6 +228,44 @@ export async function exportCardsAsImages(
   const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
   const fileName = `${safeFileName(workspaceName)}-export.zip`;
   await saveBlob(zipBlob, fileName, {
+    description: 'ZIP Archive',
+    accept: { 'application/zip': ['.zip'] },
+  });
+}
+
+/**
+ * Bundles already-rendered `CardImage[]` (the same shape `aggregateCardsToPdf`
+ * consumes) into a ZIP, one image file per card. Used by CombinePdfDialog's
+ * "export as images" output mode as an alternative to combining into a PDF —
+ * unlike `exportCardsAsImages`, this doesn't render from a template/records,
+ * it just repackages data URLs the caller already produced (from one or more
+ * workspaces, or from previously-imported files).
+ *
+ * No manifest is written: combined sources can mix card sizes (unlike a
+ * single workspace's export), so a single-size `ExportManifest` doesn't apply
+ * cleanly. A later re-import via "From exported images" simply lands in the
+ * already-supported "unsized" bucket requiring manual width/height entry.
+ */
+export async function exportCardImagesToZip(
+  cards: CardImage[],
+  format: ExportFormat,
+  fileName: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<void> {
+  if (cards.length === 0) throw new Error('No cards to export.');
+
+  const ext = format === 'jpeg' ? 'jpg' : 'png';
+  const zip = new JSZip();
+  const pad = String(cards.length).length;
+
+  for (let i = 0; i < cards.length; i++) {
+    const blob = await (await fetch(cards[i].dataUrl)).blob();
+    zip.file(`card-${String(i + 1).padStart(pad, '0')}.${ext}`, blob);
+    onProgress?.(i + 1, cards.length);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  await saveBlob(zipBlob, `${safeFileName(fileName)}.zip`, {
     description: 'ZIP Archive',
     accept: { 'application/zip': ['.zip'] },
   });

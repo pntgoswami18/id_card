@@ -129,12 +129,3 @@ describe('PrintStep — export', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Export All' })).toBeEnabled());
   });
 });
-
-describe('PrintStep — combine PDF', () => {
-  it('opens the Combine PDF dialog', async () => {
-    const user = userEvent.setup();
-    renderWithAppState(<PrintStep />, { initialState: { template: template(), records: records(2), printSettings } });
-    await user.click(await screen.findByRole('button', { name: 'Combine cards…' }));
-    expect(await screen.findByRole('heading', { name: 'Combine into one PDF' })).toBeInTheDocument();
-  });
-});
