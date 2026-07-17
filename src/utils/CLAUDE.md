@@ -77,7 +77,7 @@ Note: plain mock handle objects with function properties (e.g. in manual browser
 
 FSA only works in Chrome/Edge. Every FSA call must be guarded and fall back gracefully:
 
-- **Save workspace** — `saveWorkspaceWithPicker` falls back to `downloadWorkspaceFile` when `showSaveFilePicker` is absent.
+- **Save workspace** — `saveWorkspaceWithPicker` falls back to `downloadWorkspaceFile` when `showSaveFilePicker` is absent. `pickSaveFileHandle` splits the picker-acquisition step out on its own (no write) — callers with slow data to gather before writing (e.g. `WorkspaceSwitcher.handleSaveWorkspace`, resolving assets across a whole workspace tree) must call `pickSaveFileHandle` *first* and gather data after, since `showSaveFilePicker`'s required transient user activation can expire if the picker is requested only once all that data is ready. `saveWorkspaceWithPicker` itself still bundles picker+write for callers whose data is already in hand (e.g. `handleNewWorkspaceConfirm`, saving a fresh empty workspace).
 - **Open workspace** — `openWorkspaceWithPicker` / `openWorkspaceFilePickerWithHandle` return `null` when `showOpenFilePicker` is absent; callers must use a hidden `<input type="file">` as the fallback path.
 - **Save template** — `saveTemplateWithPicker` falls back to an `<a download>` click.
 - **Export ZIP** — `exportCardsAsImages` falls back to `URL.createObjectURL` + `<a download>` click.
