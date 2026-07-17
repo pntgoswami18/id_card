@@ -135,10 +135,16 @@ describe('WorkspaceSwitcher — creating a workspace (non-FSA fallback)', () => 
 
 describe('WorkspaceSwitcher — creating a workspace (FSA)', () => {
   it('shows the linked file immediately after creating a workspace via the FSA picker', async () => {
-    // Regression test: onSetCurrentWorkspace used to fire before the freshly-acquired
-    // handle was registered in fileHandleRef, so the handle-sync effect ran against an
-    // empty ref and never re-fired — the new workspace stayed stuck showing "Choose save
-    // location" / a disabled Autosave toggle despite the file having been saved correctly.
+    // Asserts the correct end state after the handle-registration-ordering fix (see
+    // "WorkspaceSwitcher — register the handle before switching workspace" in
+    // src/components/CLAUDE.md). NOT a true regression test: RTL's act() wraps this
+    // entire async click handler and only flushes effects once it fully resolves, so
+    // reverting the fix's statement order does not make this test fail — the real bug
+    // depended on a real browser yielding mid-handler (a genuine IndexedDB round trip),
+    // which jsdom/fake-indexeddb + act() batching don't reproduce. Verified empirically:
+    // this test still passes with the old (buggy) statement order reinstated. Treat this
+    // as a behavior-documentation test; the ordering invariant itself is only enforced by
+    // code review and the CLAUDE.md gotcha, not by automated coverage.
     const { hasSaveFilePicker, saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
     vi.mocked(hasSaveFilePicker).mockReturnValue(true);
     vi.mocked(saveWorkspaceWithPicker).mockResolvedValue(fsaHandle({ name: 'Conference_Badges.idcard' }));
@@ -155,7 +161,7 @@ describe('WorkspaceSwitcher — creating a workspace (FSA)', () => {
 
     await openMenu(user);
     expect(await screen.findByText('Saving to Conference_Badges.idcard')).toBeInTheDocument();
-    expect(document.querySelector('input[type="checkbox"]')).toBeEnabled();
+    await waitFor(() => expect(document.querySelector('input[type="checkbox"]')).toBeEnabled());
   });
 });
 
@@ -466,6 +472,47 @@ describe('WorkspaceSwitcher — duplicate-open detection', () => {
     // No duplicate entry was created — the workspace list is unchanged.
     expect(probeList()).toHaveLength(1);
     expect(probe()).toHaveAttribute('data-current-id', a.id);
+  });
+
+  it('shows the linked file immediately after opening a brand-new .idcard file via the FSA picker', async () => {
+    // Covers restoreWorkspaceFile's first-time-open path (no existing match found),
+    // which received the same handle-registration reorder as handleNewWorkspaceConfirm.
+    // Same caveat as the "creating a workspace (FSA)" test above: this documents the
+    // correct end state but is not a true regression test — verified empirically that
+    // it still passes with the pre-fix caller pattern (restoreWorkspaceFile resolving
+    // fully, then a separate setHandleForRoot call afterward) reinstated, since RTL's
+    // act() batches the whole handler's effects together regardless of source order.
+    const { hasOpenFilePicker, hasSaveFilePicker, openWorkspaceFilePickerWithHandle, readWorkspaceFile } =
+      await import('../utils/workspaceFile');
+    vi.mocked(hasOpenFilePicker).mockReturnValue(true);
+    vi.mocked(hasSaveFilePicker).mockReturnValue(true);
+    const openedHandle = fsaHandle({ name: 'Imported.idcard' });
+    vi.mocked(openWorkspaceFilePickerWithHandle).mockResolvedValue({
+      file: new File(['{}'], 'Imported.idcard'), handle: openedHandle,
+    });
+    const wsFile = {
+      version: 1 as const, app: 'id_card_generator' as const, type: 'workspace' as const, savedAt: 'x',
+      name: 'Imported Workspace',
+      data: {
+        template: { id: 't', name: 'T', elements: [], background: null, watermark: null },
+        records: [], columnMapping: {}, printPresets: [],
+        printSettings: { widthMm: 85.6, heightMm: 53.98, orientation: 'landscape' as const },
+        selectedCardIndices: [], currentTemplateSource: null,
+      },
+    };
+    vi.mocked(readWorkspaceFile).mockResolvedValue(wsFile);
+
+    const user = userEvent.setup();
+    const a = await createWorkspace('A');
+    render(<Harness initialList={[a]} initialCurrentId={a.id} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: /^Open Workspace/ }));
+
+    await waitFor(() => expect(probeList().some((w) => w.name === 'Imported Workspace')).toBe(true));
+
+    await openMenu(user);
+    expect(await screen.findByText('Saving to Imported.idcard')).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector('input[type="checkbox"]')).toBeEnabled());
   });
 });
 
