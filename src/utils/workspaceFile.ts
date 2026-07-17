@@ -16,6 +16,7 @@ export interface WorkspaceFileHandle {
   queryPermission?(opts?: { mode?: 'read' | 'readwrite' }): Promise<FSAPermissionState>;
   requestPermission?(opts?: { mode?: 'read' | 'readwrite' }): Promise<FSAPermissionState>;
   isSameEntry?(other: WorkspaceFileHandle): Promise<boolean>;
+  remove?(opts?: { recursive?: boolean }): Promise<void>;
 }
 type FSAFileHandle = WorkspaceFileHandle & { getFile(): Promise<File> };
 type SavePickerOpts = {
@@ -118,6 +119,30 @@ export async function writeWorkspaceToHandle(
     }
     return true;
   } catch {
+    return false;
+  }
+}
+
+/**
+ * Delete the file backing a workspace handle from disk. Returns true if the
+ * file is gone (including "already gone" — NotFoundError), false if removal
+ * failed (e.g. permission denied, or the handle doesn't support removal).
+ */
+export async function deleteWorkspaceFile(handle: WorkspaceFileHandle): Promise<boolean> {
+  if (typeof handle.remove !== 'function') return false;
+  if (typeof handle.requestPermission === 'function') {
+    try {
+      const state = await handle.requestPermission({ mode: 'readwrite' });
+      if (state !== 'granted') return false;
+    } catch {
+      return false;
+    }
+  }
+  try {
+    await handle.remove();
+    return true;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'NotFoundError') return true;
     return false;
   }
 }

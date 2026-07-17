@@ -20,6 +20,7 @@ vi.mock('../utils/workspaceFile', async () => {
     writeWorkspaceToHandle: vi.fn().mockResolvedValue(true),
     openWorkspaceFilePickerWithHandle: vi.fn().mockResolvedValue(null),
     readWorkspaceFile: vi.fn(),
+    deleteWorkspaceFile: vi.fn().mockResolvedValue(true),
   };
 });
 
@@ -231,6 +232,72 @@ describe('WorkspaceSwitcher — delete', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Delete current' }));
     expect(await screen.findByText(/and its 1 sub-workspace/)).toBeInTheDocument();
     expect(screen.getByText('Child')).toBeInTheDocument();
+  });
+
+  it('deletes the linked file from disk when deleting a root workspace (checkbox checked by default)', async () => {
+    const user = userEvent.setup();
+    const { deleteWorkspaceFile } = await import('../utils/workspaceFile');
+    const a = await createWorkspace('A');
+    const b = await createWorkspace('B');
+    const handle = fsaHandle({ name: 'a.idcard' });
+    render(<Harness initialList={[a, b]} initialCurrentId={a.id} initialHandles={[[a.id, handle]]} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Delete current' }));
+    const checkbox = await screen.findByRole('checkbox', { name: /Also delete a\.idcard from disk/ });
+    expect(checkbox).toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(deleteWorkspaceFile).toHaveBeenCalledWith(handle));
+  });
+
+  it('does not delete the file when the checkbox is unchecked', async () => {
+    const user = userEvent.setup();
+    const { deleteWorkspaceFile } = await import('../utils/workspaceFile');
+    const a = await createWorkspace('A');
+    const b = await createWorkspace('B');
+    const handle = fsaHandle({ name: 'a.idcard' });
+    render(<Harness initialList={[a, b]} initialCurrentId={a.id} initialHandles={[[a.id, handle]]} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Delete current' }));
+    await user.click(await screen.findByRole('checkbox', { name: /Also delete a\.idcard from disk/ }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(probeList().some((w) => w.id === a.id)).toBe(false));
+    expect(deleteWorkspaceFile).not.toHaveBeenCalled();
+  });
+
+  it('never deletes the shared file when deleting a sub-workspace, even though the root has a linked handle', async () => {
+    const user = userEvent.setup();
+    const { createSubWorkspace } = await import('../utils/workspaceStorage');
+    const { deleteWorkspaceFile } = await import('../utils/workspaceFile');
+    const a = await createWorkspace('Parent');
+    const child = await createSubWorkspace('Child', a.id);
+    const list = await getWorkspaceList();
+    const handle = fsaHandle({ name: 'parent.idcard' });
+    render(<Harness initialList={list.workspaces} initialCurrentId={child.id} initialHandles={[[a.id, handle]]} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Delete current' }));
+    expect(screen.queryByRole('checkbox', { name: /Also delete/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(probeList().some((w) => w.id === child.id)).toBe(false));
+    expect(deleteWorkspaceFile).not.toHaveBeenCalled();
+  });
+
+  it('shows an error but still deletes the workspace when file removal fails', async () => {
+    const user = userEvent.setup();
+    const { deleteWorkspaceFile } = await import('../utils/workspaceFile');
+    vi.mocked(deleteWorkspaceFile).mockResolvedValueOnce(false);
+    const a = await createWorkspace('A');
+    const b = await createWorkspace('B');
+    const handle = fsaHandle({ name: 'a.idcard' });
+    render(<Harness initialList={[a, b]} initialCurrentId={a.id} initialHandles={[[a.id, handle]]} />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'Delete current' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(probeList().some((w) => w.id === a.id)).toBe(false));
+    expect(await screen.findByText(/couldn't delete a\.idcard from disk/)).toBeInTheDocument();
   });
 });
 
