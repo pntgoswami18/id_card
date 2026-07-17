@@ -133,6 +133,32 @@ describe('WorkspaceSwitcher — creating a workspace (non-FSA fallback)', () => 
   });
 });
 
+describe('WorkspaceSwitcher — creating a workspace (FSA)', () => {
+  it('shows the linked file immediately after creating a workspace via the FSA picker', async () => {
+    // Regression test: onSetCurrentWorkspace used to fire before the freshly-acquired
+    // handle was registered in fileHandleRef, so the handle-sync effect ran against an
+    // empty ref and never re-fired — the new workspace stayed stuck showing "Choose save
+    // location" / a disabled Autosave toggle despite the file having been saved correctly.
+    const { hasSaveFilePicker, saveWorkspaceWithPicker } = await import('../utils/workspaceFile');
+    vi.mocked(hasSaveFilePicker).mockReturnValue(true);
+    vi.mocked(saveWorkspaceWithPicker).mockResolvedValue(fsaHandle({ name: 'Conference_Badges.idcard' }));
+
+    const user = userEvent.setup();
+    const meta = await createWorkspace('Existing');
+    render(<Harness initialList={[meta]} initialCurrentId={meta.id} />);
+
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: 'New workspace' }));
+    await user.type(await screen.findByLabelText('Name'), 'Conference Badges');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(probeList().some((w) => w.name === 'Conference Badges')).toBe(true));
+
+    await openMenu(user);
+    expect(await screen.findByText('Conference_Badges.idcard')).toBeInTheDocument();
+    expect(document.querySelector('input[type="checkbox"]')).toBeEnabled();
+  });
+});
+
 describe('WorkspaceSwitcher — sub-workspaces (copy-on-write)', () => {
   it('inherits the parent template/print settings and sets templateLinkedToParent', async () => {
     const user = userEvent.setup();

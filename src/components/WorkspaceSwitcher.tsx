@@ -359,13 +359,18 @@ export default function WorkspaceSwitcher({
 
     const meta = await createWorkspace(name, logo);
     const list = await getWorkspaceList();
-    onSetWorkspaceList(list.workspaces);
-    onSetCurrentWorkspace(meta.id);
-    onLoadWorkspace(defaultData);
     await saveWorkspaceData(meta.id, { ...defaultData, csvData: null });
+    // Register the handle BEFORE switching to the new workspace: onSetCurrentWorkspace
+    // triggers the handle-sync effect (keyed on currentWorkspaceId), which reads
+    // fileHandleRef synchronously on the next render — if the handle isn't in the ref
+    // yet, that effect sees "no handle" and never re-runs, permanently showing the
+    // freshly-saved workspace as unlinked (hasFileHandle stuck false).
     if (handle) {
       setHandleForRoot(meta.id, handle);
     }
+    onSetWorkspaceList(list.workspaces);
+    onSetCurrentWorkspace(meta.id);
+    onLoadWorkspace(defaultData);
     setSetupStep('choose');
     onSetupDone?.();
   };
@@ -541,7 +546,10 @@ export default function WorkspaceSwitcher({
     return null;
   };
 
-  const restoreWorkspaceFile = async (wsFile: import('../utils/workspaceFile').WorkspaceFile) => {
+  const restoreWorkspaceFile = async (
+    wsFile: import('../utils/workspaceFile').WorkspaceFile,
+    handle?: WorkspaceFileHandle,
+  ) => {
     await onSaveCurrent(); // flush any unsaved in-memory edits before switching away
 
     // Sync user templates embedded in the imported file into the local user-templates store
@@ -593,6 +601,11 @@ export default function WorkspaceSwitcher({
     list.currentId = rootId;
     await saveWorkspaceList(list);
 
+    // Register the handle BEFORE switching to the new workspace — see the matching
+    // comment in handleNewWorkspaceConfirm for why the ordering matters.
+    if (handle) {
+      setHandleForRoot(rootId, handle);
+    }
     onSetWorkspaceList(newWorkspaces);
     onSetCurrentWorkspace(rootId);
     onLoadWorkspace(wsFile.data);
@@ -615,8 +628,7 @@ export default function WorkspaceSwitcher({
       }
       const wsFile = await readWorkspaceFile(result.file);
       if (wsFile) {
-        const newRootId = await restoreWorkspaceFile(wsFile);
-        setHandleForRoot(newRootId, result.handle);
+        await restoreWorkspaceFile(wsFile, result.handle);
       } else {
         setOpenError('Invalid workspace file. Please select a valid .idcard file.');
       }
